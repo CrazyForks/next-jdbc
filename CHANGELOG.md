@@ -3,7 +3,7 @@
 Only accretive/fixative changes will be made from now on.
 
 * 1.3.next in progress
-  * Update dependency versions, including updating `tools.build` to 0.10.0.
+  * Update dev dependencies, including testing against Clojure 1.12 Alpha 11.
 
 * 1.3.925 -- 2024-03-15
   * Address [#275](https://github.com/seancorfield/next-jdbc/issues/275) by noting that PostgreSQL may perform additional SQL queries to produce table names used in qualified result set builders.
