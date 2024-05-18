@@ -3,6 +3,7 @@
 Only accretive/fixative changes will be made from now on.
 
 * 1.3.next in progress
+  * Fix [#280](https://github.com/seancorfield/next-jdbc/issues/280) by allowing `-` as well as `_` in `nav` foreign key names.
   * Update dev dependencies, including testing against Clojure 1.12 Alpha 11.
 
 * 1.3.925 -- 2024-03-15

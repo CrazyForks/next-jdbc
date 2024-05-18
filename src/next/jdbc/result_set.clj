@@ -1037,7 +1037,7 @@
   (let [fk-suffix (get-in opts [:schema-opts :fk-suffix] "id")
         pk        (get-in opts [:schema-opts :pk]        "id")
         pk-fn     (get-in opts [:schema-opts :pk-fn]     (constantly (name pk)))
-        [_ table] (re-find (re-pattern (str "(?i)^(.+?)_?"
+        [_ table] (re-find (re-pattern (str "(?i)^(.+?)[-_]?"
                                             (name fk-suffix)
                                             "$"))
                            (name col))]
@@ -1050,8 +1050,10 @@
   (default-schema {} :user_statusid)
   (default-schema {:schema-opts {:fk-suffix "did"}} :user_id)
   (default-schema {:schema-opts {:fk-suffix "did"}} :user_did)
+  (default-schema {:schema-opts {:fk-suffix "did"}} :user-did)
   (default-schema {:schema-opts {:fk-suffix "(did|id)"}} :user_id)
   (default-schema {:schema-opts {:fk-suffix "(did|id)"}} :user_did)
+  (default-schema {:schema-opts {:fk-suffix "(did|id)"}} :user-did)
   (default-schema {:schema-opts {:fk-suffix "(did|id)"
                                  :pk :did}} :user_did)
   (default-schema {:schema-opts {:fk-suffix "(did|id)"
@@ -1061,6 +1063,13 @@
                                             "id"
                                             pk))}}
                   :user_did)
+  (default-schema {:schema-opts {:fk-suffix "(did|id)"
+                                 :pk :did
+                                 :pk-fn (fn [table pk]
+                                          (if (= "user" table)
+                                            "id"
+                                            pk))}}
+                  :user-did)
   (default-schema {:schema-opts {:fk-suffix "(did|id)"
                                  :pk :did
                                  :pk-fn (fn [table pk]
