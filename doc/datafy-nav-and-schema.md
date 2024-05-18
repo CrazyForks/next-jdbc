@@ -36,7 +36,7 @@ For `:fk-suffix`, the `_` is still permitted and optional in the column name,
 so if you specified `:schema-opts {:fk-suffix "fk"}` then `addressfk` and
 `address_fk` would both be treated as foreign keys into the `address` table.
 
-_Note: as of 1.3.next, `-` is permitted in key names (in addition to `_`) so that kebab result set builders work as expected._
+_Note: as of 1.3.939, `-` is permitted in key names (in addition to `_`) so that kebab result set builders work as expected._
 
 The `:pk-fn` can use the table name to determine the primary key column name
 for exceptions to the `:pk` value. For example, if you have a table `address`

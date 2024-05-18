@@ -2,7 +2,7 @@
 
 Only accretive/fixative changes will be made from now on.
 
-* 1.3.next in progress
+* 1.3.939 -- 2024-05-17
   * Fix [#280](https://github.com/seancorfield/next-jdbc/issues/280) by allowing `-` as well as `_` in `nav` foreign key names.
   * Address [#279](https://github.com/seancorfield/next-jdbc/issues/279) by adding the missing documentation.
   * Address [#278](https://github.com/seancorfield/next-jdbc/issues/278) by fixing link in options page.
