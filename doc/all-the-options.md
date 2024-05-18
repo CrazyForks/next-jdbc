@@ -83,7 +83,7 @@ result set:
 * `:schema` -- override the conventions for identifying foreign keys and the related (primary) keys in the tables to which they refer, on a per table/column basis; can also be used to indicate a fk relationship is one-to-many or many-to-many rather than one-to-one or one-to-many,
 * `:schema-opts` -- override the default conventions for identifying foreign keys and the related (primary) keys in the tables to which they refer, as a whole.
 
-See [`datafy`, `nav`, and `:schema`](/doc/datafy-nav-schema.md) for more details.
+See [`datafy`, `nav`, and `:schema`](/doc/datafy-nav-and-schema.md) for more details.
 
 ## Statements & Prepared Statements
 
