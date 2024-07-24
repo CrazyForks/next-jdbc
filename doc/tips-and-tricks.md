@@ -247,7 +247,11 @@ method is called for each query. If you want to avoid those extra queries,
 and you can live with unqualified column names, you can use `as-unqualified-maps`
 as the result set builder instead.
 
-If you have a query where you want to select where a column is `IN` a sequence of values, you can use `col = ANY(?)` with a native array of the values instead of `IN (?,?,?,,,?)` and a sequence of values.
+If you have a query where you want to select where a column is `IN` a sequence of values, you can use `col = ANY(?)` with a native array of the values instead of `IN (?,?,?,,,?)` and a sequence of values. **Be aware of
+[PostgreSQL bug 17822](https://www.postgresql.org/message-id/flat/17922-1e2e0aeedd294424%40postgresql.org)
+which can cause pathological performance when the array has a single element!**
+If you think you might have a single-element array, consider using `UNNEST` and
+`IN` instead.
 
 What does this mean for your use of `next.jdbc`? In `plan`, `execute!`, and `execute-one!`, you can use `col = ANY(?)` in the SQL string and a single primitive array parameter, such as `(int-array [1 2 3 4])`. That means that in `next.jdbc.sql`'s functions that take a where clause (`find-by-keys`, `update!`, and `delete!`) you can specify `["col = ANY(?)" (int-array data)]` for what would be a `col IN (?,?,?,,,?)` where clause for other databases and require multiple values.
 
