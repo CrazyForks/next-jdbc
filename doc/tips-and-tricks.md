@@ -417,14 +417,12 @@ containing JSON:
       (.setValue (->json x)))))
 
 (defn <-pgobject
-  "Transform PGobject containing `json` or `jsonb` value to Clojure
-  data."
-  [^org.postgresql.util.PGobject v]
+  "Transform PGobject containing `json` or `jsonb` value to Clojure data."
+  [^PGobject v]
   (let [type  (.getType v)
         value (.getValue v)]
     (if (#{"jsonb" "json"} type)
-      (when value
-        (with-meta (<-json value) {:pgtype type}))
+      (some-> value <-json (with-meta {:pgtype type}))
       value)))
 ```
 
