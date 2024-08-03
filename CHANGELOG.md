@@ -6,7 +6,7 @@ Only accretive/fixative changes will be made from now on.
   * Update PostgreSQL **Tips & Tricks** example code to fix possible NPE. PR [#284](https://github.com/seancorfield/next-jdbc/pull/284) from [@ExNexu](https://github.com/ExNexu).
   * Address [#283](https://github.com/seancorfield/next-jdbc/issues/283) by adding a note in the documentation, linking to the PostgreSQL bug report about `ANY(array)`.
   * Address [#269](https://github.com/seancorfield/next-jdbc/issues/269) by adding `:name-fn` as an option (primarily for the SQL builder functions, but also for result set processing); the default is `clojure.core/name` but you can now use `next.jdbc.sql.builder/qualified-name` to preserve the qualifier.
-  * Update testing deps.
+  * Update testing deps; `docker-compose` => `docker compose`.
 
 * 1.3.939 -- 2024-05-17
   * Fix [#280](https://github.com/seancorfield/next-jdbc/issues/280) by allowing `-` as well as `_` in `nav` foreign key names.
