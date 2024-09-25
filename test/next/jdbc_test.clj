@@ -904,9 +904,9 @@ INSERT INTO fruit (name, appearance) VALUES (?,?)
                              {:multi-rs true})
               zero-updates [{:next.jdbc/update-count 0}]]
           (cond (postgres?) ; does not support multiple result sets yet
-                (do
-                  (is (= 1 (count multi-rs)))
-                  (is (= zero-updates (first multi-rs))))
+                ;; 4.7.3 (and earlier?) returned the fake zero-updates
+                ;; 4.7.4 returns -1 for update count and an empty result set
+                (is (= 0 (count multi-rs)))
                 (hsqldb?)
                 (do
                   (is (= 3 (count multi-rs)))
