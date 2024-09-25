@@ -1,4 +1,3 @@
-version: '2'
 services:
   mysql:
     image: percona:5.7
@@ -9,9 +8,9 @@ services:
     command:
       [--character-set-server=utf8mb4, --collation-server=utf8mb4_unicode_ci]
   sqlserver:
-    image: mcr.microsoft.com/mssql/server:2019-GA-ubuntu-16.04
+    image: mcr.microsoft.com/mssql/server:2022-latest
     environment:
       ACCEPT_EULA: Y
-      SA_PASSWORD: Str0ngP4ssw0rd
+      MSSQL_SA_PASSWORD: Str0ngP4ssw0rd
     ports:
       - "1433:1433"
