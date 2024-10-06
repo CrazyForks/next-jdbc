@@ -41,7 +41,7 @@ Except for `query` (which is simply an alias for `execute!`), all the "friendly"
 
 * `:table-fn` -- the quoting function to be used on the string that identifies the table name, if provided; this also applies to assumed table names when `nav`igating schemas,
 * `:column-fn` -- the quoting function to be used on any string that identifies a column name, if provided; this also applies to the reducing function context over `plan` and to assumed foreign key column names when `nav`igating schemas.
-* `:name-fn` -- may be provided as `next.jdbc.sql.builder/qualified-name` to preserve qualifiers on table and column names; you will need to provide `:table-fn` and/or `:column-fn` as well, in order to quote qualified names properly; new in 1.3.next.
+* `:name-fn` -- may be provided as `next.jdbc.sql.builder/qualified-name` to preserve qualifiers on table and column names; you will need to provide `:table-fn` and/or `:column-fn` as well, in order to quote qualified names properly; new in 1.3.955.
 
 They also support a `:suffix` argument which can be used to specify a SQL string that should be appended to the generated SQL string before executing it, e.g., `:suffix "FOR UPDATE"` or, for an `insert!` call `:suffix "RETURNING *"`.
 The latter is particularly useful for databases, such as SQLite these days,
@@ -71,7 +71,7 @@ Any function that might realize a row or a result set will accept:
 * `:label-fn` -- if `:builder-fn` is specified as one of `next.jdbc.result-set`'s `as-modified-*` builders, this option must be present and should specify a string-to-string transformation that will be applied to the column label for each returned column name.
 * `:qualifier-fn` -- if `:builder-fn` is specified as one of `next.jdbc.result-set`'s `as-modified-*` builders, this option should specify a string-to-string transformation that will be applied to the table name for each returned column name. It will be called with an empty string if the table name is not available. It can be omitted for the `as-unqualified-modified-*` variants.
 * `:column-fn` -- if present, applied to each column name before looking up the column in the `ResultSet` to get that column's value.
-* `:name-fn` -- may be provided as `next.jdbc.sql.builder/qualified-name` to preserve qualifiers on keyword used as column names; by default, a keyword like `:foo/bar` is treated as `"bar"` when looking up columns in a `ResultSet`; `:name-fn` allows you to refer to column names that contain `/`, which some databases allow; if both `:name-fn` and `:column-fn` are provided, `:name-fn` is applied first to the keyword (to produce a string) and then `:column-fn` is applied to that; new in 1.3.next.
+* `:name-fn` -- may be provided as `next.jdbc.sql.builder/qualified-name` to preserve qualifiers on keyword used as column names; by default, a keyword like `:foo/bar` is treated as `"bar"` when looking up columns in a `ResultSet`; `:name-fn` allows you to refer to column names that contain `/`, which some databases allow; if both `:name-fn` and `:column-fn` are provided, `:name-fn` is applied first to the keyword (to produce a string) and then `:column-fn` is applied to that; new in 1.3.955.
 
 In addition, `execute!` accepts the `:multi-rs true` option to return multiple result sets -- as a vector of result sets.
 
