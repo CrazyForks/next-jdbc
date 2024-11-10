@@ -1,4 +1,4 @@
-;; copyright (c) 2018-2023 Sean Corfield, all rights reserved
+;; copyright (c) 2018-2024 Sean Corfield, all rights reserved
 
 (ns next.jdbc
   "The public API of the next generation java.jdbc library.

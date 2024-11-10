@@ -1,4 +1,4 @@
-;; copyright (c) 2019-2021 Sean Corfield, all rights reserved
+;; copyright (c) 2019-2024 Sean Corfield, all rights reserved
 
 (ns next.jdbc.connection-string-test
   "Tests for the main hash map spec to JDBC URL logic and the get-datasource

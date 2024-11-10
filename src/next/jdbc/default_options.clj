@@ -1,4 +1,4 @@
-;; copyright (c) 2020-2021 Sean Corfield, all rights reserved
+;; copyright (c) 2020-2024 Sean Corfield, all rights reserved
 
 (ns ^:no-doc next.jdbc.default-options
   "Implementation of default options logic."

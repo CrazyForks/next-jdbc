@@ -1,4 +1,4 @@
-;; copyright (c) 2021-2023 Sean Corfield, all rights reserved
+;; copyright (c) 2021-2024 Sean Corfield, all rights reserved
 
 (ns ^:no-doc next.jdbc.sql-logging
   "Implementation of sql-logging logic."

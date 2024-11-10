@@ -88,6 +88,6 @@ In addition, convenience functions -- "syntactic sugar" -- are provided to inser
 
 ## License
 
-Copyright © 2018-2021 Sean Corfield
+Copyright © 2018-2024 Sean Corfield
 
 Distributed under the Eclipse Public License version 1.0.
