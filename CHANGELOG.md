@@ -2,6 +2,9 @@
 
 Only accretive/fixative changes will be made from now on.
 
+* 1.3.next in progress
+  * Fix [#287](https://github.com/seancorfield/next-jdbc/issues/287) by merging user-supplied options over `:return-keys true`.
+
 * 1.3.955 -- 2024-10-06
   * Address [#285](https://github.com/seancorfield/next-jdbc/issues/285) by setting the default Clojure version to the earliest supported (1.10.3) to give a better hint to users.
   * Update PostgreSQL **Tips & Tricks** example code to fix possible NPE. PR [#284](https://github.com/seancorfield/next-jdbc/pull/284) from [@ExNexu](https://github.com/ExNexu).

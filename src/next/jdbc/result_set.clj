@@ -952,14 +952,14 @@
     (reify
       clojure.lang.IReduceInit
       (reduce [_ f init]
-        (reduce-stmt this f init (assoc opts :return-keys true)))
+        (reduce-stmt this f init (merge {:return-keys true} opts)))
       r/CollFold
       (coll-fold [_ n combinef reducef]
         (fold-stmt this n combinef reducef (.getConnection this)
-                   (assoc opts :return-keys true)))
+                   (merge {:return-keys true} opts)))
       (toString [_] "`IReduceInit` from `plan` -- missing reduction?")))
   (-execute-one [this _ opts]
-    (if-let [rs (stmt->result-set this (assoc opts :return-keys true))]
+    (if-let [rs (stmt->result-set this (merge {:return-keys true} opts))]
       (let [builder-fn (get opts :builder-fn as-maps)
             builder    (builder-fn rs opts)]
         (when (.next rs)
@@ -970,10 +970,10 @@
     (if (:multi-rs opts)
       (loop [go (.execute this) acc []]
         (if-let [rs (stmt->result-set-update-count
-                     (.getConnection this) this go (assoc opts :return-keys true))]
+                     (.getConnection this) this go (merge {:return-keys true} opts))]
           (recur (.getMoreResults this) (conj acc rs))
           acc))
-      (if-let [rs (stmt->result-set this (assoc opts :return-keys true))]
+      (if-let [rs (stmt->result-set this (merge {:return-keys true} opts))]
         (datafiable-result-set rs (.getConnection this) opts)
         [{:next.jdbc/update-count (.getUpdateCount this)}])))
 
@@ -1006,7 +1006,7 @@
     (if (:multi-rs opts)
       (loop [go (.execute this (first sql-params)) acc []]
         (if-let [rs (stmt->result-set-update-count
-                     (.getConnection this) this go (assoc opts :return-keys true))]
+                     (.getConnection this) this go (merge {:return-keys true} opts))]
           (recur (.getMoreResults this) (conj acc rs))
           acc))
       (if-let [rs (stmt-sql->result-set this (first sql-params))]
