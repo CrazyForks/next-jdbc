@@ -113,9 +113,12 @@
              (catch Exception _))))))))
 
 (defn- raw-connection ^Connection [^Connection con]
-  (if (.isWrapperFor con Connection)
-    (.unwrap con Connection)
-    con))
+  (try ; because some drivers do not implement this :(
+    (if (.isWrapperFor con Connection)
+      (.unwrap con Connection)
+      con)
+    (catch Exception _
+      con)))
 
 (extend-protocol p/Transactable
   java.sql.Connection
