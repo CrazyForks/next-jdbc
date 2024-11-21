@@ -137,6 +137,7 @@
   * `sqlserver`, `mssql` -- `com.microsoft.sqlserver.jdbc.SQLServerDriver` -- `1433`
   * `timesten:client` -- `com.timesten.jdbc.TimesTenClientDriver`
   * `timesten:direct` -- `com.timesten.jdbc.TimesTenDriver`
+  * `xtdb` -- `xtdb.jdbc.Driver` -- an XTDB wrapper around `postgresql`
 
   For more details about `:dbtype` and `:classname` values, see:
   https://cljdoc.org/d/com.github.seancorfield/next.jdbc/CURRENT/api/next.jdbc.connection#dbtypes"

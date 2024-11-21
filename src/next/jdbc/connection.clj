@@ -130,7 +130,9 @@
                       :host :none}
    "timesten:direct" {:classname "com.timesten.jdbc.TimesTenDriver"
                       :dbname-separator ":dsn="
-                      :host :none}})
+                      :host :none}
+   "xtdb"            {:classname "xtdb.jdbc.Driver"
+                      :port 5432}})
 
 (def ^:private driver-cache
   "An optimization for repeated calls to get-datasource, or for get-connection
