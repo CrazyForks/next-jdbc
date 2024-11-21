@@ -117,7 +117,7 @@
     (if (.isWrapperFor con Connection)
       (.unwrap con Connection)
       con)
-    (catch Exception _
+    (catch Throwable _ ; to catch AbstractMethodError :(
       con)))
 
 (extend-protocol p/Transactable
