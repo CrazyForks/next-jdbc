@@ -4,6 +4,7 @@ Only accretive/fixative changes will be made from now on.
 
 * 1.3.next in progress
   * Fix [#287](https://github.com/seancorfield/next-jdbc/issues/287) by merging user-supplied options over `:return-keys true`.
+  * Fix [#282](https://github.com/seancorfield/next-jdbc/issues/282) by tracking raw `Connection` objects for active TXs, which relaxes several of the conditions around nested transactions.
 
 * 1.3.955 -- 2024-10-06
   * Address [#285](https://github.com/seancorfield/next-jdbc/issues/285) by setting the default Clojure version to the earliest supported (1.10.3) to give a better hint to users.

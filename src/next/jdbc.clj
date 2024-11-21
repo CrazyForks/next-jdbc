@@ -447,12 +447,19 @@
   "Returns true if `next.jdbc` has a currently active transaction in the
   current thread, else false.
 
+  With no arguments, tells you if any transaction is currently active.
+
+  With a `Connection` argument, tells you if a transaction is currently
+  active on that specific connection.
+
   Note: transactions are a convention of operations on a `Connection` so
   this predicate only reflects `next.jdbc/transact` and `next.jdbc/with-transaction`
   operations -- it does not reflect any other operations on a `Connection`,
   performed via JDBC interop directly."
-  []
-  @#'tx/*active-tx*)
+  ([]
+   (boolean (seq @#'tx/*active-tx*)))
+  ([con]
+   (contains? @#'tx/*active-tx* con)))
 
 (defn with-options
   "Given a connectable/transactable object and a set of (default) options

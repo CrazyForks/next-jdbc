@@ -38,7 +38,7 @@
   :allow)
 
 (defonce ^:private ^:dynamic ^{:doc "Used to detect nested transactions."}
-  *active-tx* false)
+  *active-tx* #{})
 
 (def ^:private isolation-levels
   "Transaction isolation levels."
@@ -112,43 +112,37 @@
              (.setReadOnly con old-readonly)
              (catch Exception _))))))))
 
+(defn- raw-connection ^Connection [^Connection con]
+  (if (.isWrapperFor con Connection)
+    (.unwrap con Connection)
+    con))
+
 (extend-protocol p/Transactable
   java.sql.Connection
   (-transact [this body-fn opts]
-    (cond
-      (and (not *active-tx*) (= :ignore *nested-tx*))
-      ;; #245 do not lock when in c.j.j compatibility mode:
-      (binding [*active-tx* true]
-        (transact* this body-fn opts))
-      (or (not *active-tx*) (= :allow *nested-tx*))
-      (locking this
-        (binding [*active-tx* true]
-          (transact* this body-fn opts)))
-      (= :ignore *nested-tx*)
-      (body-fn this)
-      (= :prohibit *nested-tx*)
-      (throw (IllegalStateException. "Nested transactions are prohibited"))
-      :else
-      (throw (IllegalArgumentException.
-              (str "*nested-tx* ("
-                   *nested-tx*
-                   ") was not :allow, :ignore, or :prohibit")))))
+    (let [raw (raw-connection this)]
+      (cond
+        (and (not (contains? *active-tx* raw)) (= :ignore *nested-tx*))
+        ;; #245 do not lock when in c.j.j compatibility mode:
+        (binding [*active-tx* (conj *active-tx* raw)]
+          (transact* this body-fn opts))
+        (or (not (contains? *active-tx* raw)) (= :allow *nested-tx*))
+        (locking this
+          (binding [*active-tx* (conj *active-tx* raw)]
+            (transact* this body-fn opts)))
+        (= :ignore *nested-tx*)
+        (body-fn this)
+        (= :prohibit *nested-tx*)
+        (throw (IllegalStateException. "Nested transactions are prohibited"))
+        :else
+        (throw (IllegalArgumentException.
+                (str "*nested-tx* ("
+                     *nested-tx*
+                     ") was not :allow, :ignore, or :prohibit"))))))
   javax.sql.DataSource
   (-transact [this body-fn opts]
-    (cond (or (not *active-tx*) (= :allow *nested-tx*))
-      (binding [*active-tx* true]
-        (with-open [con (p/get-connection this opts)]
-          (transact* con body-fn opts)))
-      (= :ignore *nested-tx*)
-      (with-open [con (p/get-connection this opts)]
-        (body-fn con))
-      (= :prohibit *nested-tx*)
-      (throw (IllegalStateException. "Nested transactions are prohibited"))
-      :else
-      (throw (IllegalArgumentException.
-              (str "*nested-tx* ("
-                   *nested-tx*
-                   ") was not :allow, :ignore, or :prohibit")))))
+    (with-open [con (p/get-connection this opts)]
+      (p/-transact con body-fn opts)))
   Object
   (-transact [this body-fn opts]
     (p/-transact (p/get-datasource this) body-fn opts)))
