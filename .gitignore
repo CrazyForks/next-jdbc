@@ -6,7 +6,6 @@
 .calva/repl.calva-repl
 .classpath
 .clj-kondo/.cache
-.clj-kondo/com.github.seancorfield/next.jdbc
 .cpcache
 .eastwood
 .factorypath
