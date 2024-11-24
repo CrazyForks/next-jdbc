@@ -12,9 +12,9 @@
             [next.jdbc.protocols :as p]
             [next.jdbc.result-set :as rs]
             [next.jdbc.specs :as specs]
-            [next.jdbc.test-fixtures :refer [with-test-db ds column
-                                              default-options
-                                              derby? mssql? mysql? postgres?]])
+            [next.jdbc.test-fixtures :refer [with-test-db ds column index col-kw
+                                             default-options
+                                             derby? mssql? mysql? postgres? xtdb?]])
   (:import (java.sql ResultSet ResultSetMetaData)))
 
 (set! *warn-on-reflection* true)
@@ -93,7 +93,7 @@
 (deftest test-map-row-builder
   (testing "default row builder"
     (let [row (p/-execute-one (ds)
-                              ["select * from fruit where id = ?" 1]
+                              [(str "select * from fruit where " (index) " = ?") 1]
                               (default-options))]
       (is (map? row))
       (is (contains? row (column :FRUIT/GRADE)))
@@ -101,7 +101,7 @@
       (is (= 1 ((column :FRUIT/ID) row)))
       (is (= "Apple" ((column :FRUIT/NAME) row))))
     (let [rs (p/-execute-all (ds)
-                             ["select * from fruit order by id"]
+                             [(str "select * from fruit order by " (index))]
                              (default-options))]
       (is (every? map? rs))
       (is (= 1 ((column :FRUIT/ID) (first rs))))
@@ -110,7 +110,7 @@
       (is (= "Orange" ((column :FRUIT/NAME) (last rs))))))
   (testing "unqualified row builder"
     (let [row (p/-execute-one (ds)
-                              ["select * from fruit where id = ?" 2]
+                              [(str "select * from fruit where " (index) " = ?") 2]
                               {:builder-fn rs/as-unqualified-maps})]
       (is (map? row))
       (is (contains? row (column :COST)))
@@ -119,7 +119,7 @@
       (is (= "Banana" ((column :NAME) row)))))
   (testing "lower-case row builder"
     (let [row (p/-execute-one (ds)
-                              ["select * from fruit where id = ?" 3]
+                              [(str "select * from fruit where " (index) " = ?") 3]
                               (assoc (default-options)
                                      :builder-fn rs/as-lower-maps))]
       (is (map? row))
@@ -129,33 +129,33 @@
       (is (= "Peach" (:fruit/name row)))))
   (testing "unqualified lower-case row builder"
     (let [row (p/-execute-one (ds)
-                              ["select * from fruit where id = ?" 4]
+                              [(str "select * from fruit where " (index) " = ?") 4]
                               {:builder-fn rs/as-unqualified-lower-maps})]
       (is (map? row))
       (is (= 4 (:id row)))
       (is (= "Orange" (:name row)))))
   (testing "kebab-case row builder"
     (let [row (p/-execute-one (ds)
-                              ["select id,name,appearance as looks_like from fruit where id = ?" 3]
+                              [(str "select " (index) ",name,appearance as looks_like from fruit where " (index) " = ?") 3]
                               (assoc (default-options)
                                      :builder-fn rs/as-kebab-maps))]
       (is (map? row))
-      (is (contains? row :fruit/looks-like))
-      (is (nil? (:fruit/looks-like row)))
-      (is (= 3 (:fruit/id row)))
-      (is (= "Peach" (:fruit/name row)))))
+      (is (contains? row (col-kw :fruit/looks-like)))
+      (is (nil? ((col-kw :fruit/looks-like) row)))
+      (is (= 3 ((col-kw :fruit/id) row)))
+      (is (= "Peach" ((col-kw :fruit/name) row)))))
   (testing "unqualified kebab-case row builder"
     (let [row (p/-execute-one (ds)
-                              ["select id,name,appearance as looks_like from fruit where id = ?" 4]
+                              [(str "select " (index) ",name,appearance as looks_like from fruit where " (index) " = ?") 4]
                               {:builder-fn rs/as-unqualified-kebab-maps})]
       (is (map? row))
       (is (contains? row :looks-like))
       (is (= "juicy" (:looks-like row)))
-      (is (= 4 (:id row)))
+      (is (= 4 ((col-kw :id) row)))
       (is (= "Orange" (:name row)))))
   (testing "custom row builder 1"
     (let [row (p/-execute-one (ds)
-                              ["select fruit.*, id + 100 as newid from fruit where id = ?" 3]
+                              [(str "select fruit.*, " (index) " + 100 as newid from fruit where " (index) " = ?") 3]
                               (assoc (default-options)
                                      :builder-fn rs/as-modified-maps
                                      :label-fn str/lower-case
@@ -181,7 +181,7 @@
       (is (= "Peach" (:vegetable/name row)))))
   (testing "adapted row builder"
     (let [row (p/-execute-one (ds)
-                              ["select * from fruit where id = ?" 3]
+                              [(str "select * from fruit where " (index) " = ?") 3]
                               (assoc
                                (default-options)
                                :builder-fn (rs/as-maps-adapter
@@ -207,7 +207,7 @@
                    (fn [^ResultSet rs _ ^Integer i]
                      (.getObject rs i)))
           row (p/-execute-one (ds)
-                              ["select * from fruit where id = ?" 3]
+                              [(str "select * from fruit where " (index) " = ?") 3]
                               (assoc
                                (default-options)
                                :builder-fn (rs/as-maps-adapter
@@ -299,31 +299,31 @@
   (testing "no row builder is used"
     (is (= [true]
            (into [] (map map?) ; it looks like a real map now
-                 (p/-execute (ds) ["select * from fruit where id = ?" 1]
+                 (p/-execute (ds) [(str "select * from fruit where " (index) " = ?") 1]
                              {:builder-fn (constantly nil)}))))
     (is (= ["Apple"]
            (into [] (map :name) ; keyword selection works
-                 (p/-execute (ds) ["select * from fruit where id = ?" 1]
+                 (p/-execute (ds) [(str "select * from fruit where " (index) " = ?") 1]
                              {:builder-fn (constantly nil)}))))
     (is (= [[2 [:name "Banana"]]]
            (into [] (map (juxt #(get % "id") ; get by string key works
                                #(find % :name))) ; get MapEntry works
-                 (p/-execute (ds) ["select * from fruit where id = ?" 2]
+                 (p/-execute (ds) [(str "select * from fruit where " (index) " = ?") 2]
                              {:builder-fn (constantly nil)}))))
     (is (= [{:id 3 :name "Peach"}]
            (into [] (map #(select-keys % [:id :name])) ; select-keys works
-                 (p/-execute (ds) ["select * from fruit where id = ?" 3]
+                 (p/-execute (ds) [(str "select * from fruit where " (index) " = ?") 3]
                              {:builder-fn (constantly nil)}))))
     (is (= [[:orange 4]]
            (into [] (map #(vector (if (contains? % :name) ; contains works
                                     (keyword (str/lower-case (:name %)))
                                     :unnamed)
                                   (get % :id 0))) ; get with not-found works
-                 (p/-execute (ds) ["select * from fruit where id = ?" 4]
+                 (p/-execute (ds) [(str "select * from fruit where " (index) " = ?") 4]
                              {:builder-fn (constantly nil)}))))
     (is (= [{}]
            (into [] (map empty) ; return empty map without building
-                 (p/-execute (ds) ["select * from fruit where id = ?" 1]
+                 (p/-execute (ds) [(str "select * from fruit where " (index) " = ?") 1]
                              {:builder-fn (constantly nil)})))))
   (testing "count does not build a map"
     (let [count-builder (fn [_1 _2]
@@ -331,7 +331,7 @@
                             (column-count [_] 13)))]
       (is (= [13]
              (into [] (map count) ; count relies on columns, not row fields
-                   (p/-execute (ds) ["select * from fruit where id = ?" 1]
+                   (p/-execute (ds) [(str "select * from fruit where " (index) " = ?") 1]
                                {:builder-fn count-builder}))))))
   (testing "assoc, dissoc, cons, seq, and = build maps"
     (is (map? (reduce (fn [_ row] (reduced (assoc row :x 1)))
@@ -467,7 +467,7 @@
               metadata))))
 
 (deftest clob-reading
-  (when-not (or (mssql?) (mysql?) (postgres?)) ; no clob in these
+  (when-not (or (mssql?) (mysql?) (postgres?) (xtdb?)) ; no clob in these
     (with-open [con (p/get-connection (ds) {})]
       (try
         (p/-execute-one con ["DROP TABLE CLOBBER"] {})

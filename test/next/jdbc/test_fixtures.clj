@@ -64,11 +64,17 @@
 (def ^:private test-jtds
   (when (System/getenv "NEXT_JDBC_TEST_MSSQL") test-jtds-map))
 
+(def ^:private test-xtdb-map {:dbtype "xtdb"})
+
+(def ^:private test-xtdb
+  (when (System/getenv "NEXT_JDBC_TEST_XTDB") test-xtdb-map))
+
 (def ^:private test-db-specs
   (cond-> [test-derby test-h2-mem test-h2 test-hsql test-sqlite]
     test-postgres (conj test-postgres)
     test-mysql    (conj test-mysql)
-    test-mssql    (conj test-mssql test-jtds)))
+    test-mssql    (conj test-mssql test-jtds)
+    test-xtdb     (conj test-xtdb)))
 
 (def ^:private test-db-spec (atom nil))
 
@@ -86,18 +92,33 @@
 
 (defn postgres? [] (= "embedded-postgres" (:dbtype @test-db-spec)))
 
+(defn xtdb? [] (= "xtdb" (:dbtype @test-db-spec)))
+
 (defn sqlite? [] (= "sqlite" (:dbtype @test-db-spec)))
 
-(defn stored-proc? [] (not (#{"derby" "h2" "h2:mem" "sqlite"} (:dbtype @test-db-spec))))
+(defn stored-proc? [] (not (#{"derby" "h2" "h2:mem" "sqlite" "xtdb"}
+                            (:dbtype @test-db-spec))))
 
 (defn column [k]
   (let [n (namespace k)]
     (keyword (when n (cond (postgres?) (str/lower-case n)
                            (mssql?)    (str/lower-case n)
                            (mysql?)    (str/lower-case n)
+                           (xtdb?)     nil
                            :else       n))
              (cond (postgres?) (str/lower-case (name k))
+                   (xtdb?)     (let [c (str/lower-case (name k))]
+                                 (if (= "id" c) "_id" c))
                    :else       (name k)))))
+
+(defn index []
+  (if (xtdb?) "_id" "id"))
+
+(defn col-kw [k]
+  (if (xtdb?)
+    (let [n (name k)]
+      (if (= "id" n) :_id (keyword n)))
+    k))
 
 (defn default-options []
   (if (mssql?) ; so that we get table names back from queries
@@ -156,29 +177,51 @@
                 :else
                 "AUTO_INCREMENT PRIMARY KEY")]
       (with-open [con (jdbc/get-connection (ds))]
-        (when (stored-proc?)
-          (try
-            (jdbc/execute-one! con ["DROP PROCEDURE FRUITP"])
-            (catch Throwable _)))
-        (try
-          (do-commands con [(str "DROP TABLE " fruit)])
-          (catch Exception _))
-        (try
-          (do-commands con [(str "DROP TABLE " btest)])
-          (catch Exception _))
-        (when (postgres?)
-          (try
-            (do-commands con ["DROP TABLE LANG_TEST"])
-            (catch Exception _))
-          (try
-            (do-commands con ["DROP TYPE LANGUAGE"])
-            (catch Exception _))
-          (do-commands con ["CREATE TYPE LANGUAGE AS ENUM('en','fr','de')"])
-          (do-commands con ["
+        (if (xtdb?) ; no DDL for creation
+          (do
+            (try
+              (do-commands con ["DELETE FROM fruit WHERE true"])
+              (catch Throwable _))
+            (sql/insert-multi! con :fruit
+                               [:_id :name :appearance :cost]
+                               [[1 "Apple" "red" 59]]
+                               {:return-keys false})
+            (sql/insert-multi! con :fruit
+                               [:_id :name :appearance :grade]
+                               [[2 "Banana" "yellow" 92.2]]
+                               {:return-keys false})
+            (sql/insert-multi! con :fruit
+                               [:_id :name :cost :grade]
+                               [[3 "Peach" 139 90.0]]
+                               {:return-keys false})
+            (sql/insert-multi! con :fruit
+                               [:_id :name :appearance :cost :grade]
+                               [[4 "Orange" "juicy" 89 88.6]]
+                               {:return-keys false}))
+          (do
+            (when (stored-proc?)
+              (try
+                (jdbc/execute-one! con ["DROP PROCEDURE FRUITP"])
+                (catch Throwable _)))
+            (try
+              (do-commands con [(str "DROP TABLE " fruit)])
+              (catch Exception _))
+            (try
+              (do-commands con [(str "DROP TABLE " btest)])
+              (catch Exception _))
+            (when (postgres?)
+              (try
+                (do-commands con ["DROP TABLE LANG_TEST"])
+                (catch Exception _))
+              (try
+                (do-commands con ["DROP TYPE LANGUAGE"])
+                (catch Exception _))
+              (do-commands con ["CREATE TYPE LANGUAGE AS ENUM('en','fr','de')"])
+              (do-commands con ["
 CREATE TABLE LANG_TEST (
   LANG LANGUAGE NOT NULL
 )"]))
-        (do-commands con [(str "
+            (do-commands con [(str "
 CREATE TABLE " fruit " (
   ID INTEGER " auto-inc-pk ",
   NAME VARCHAR(32),
@@ -186,28 +229,28 @@ CREATE TABLE " fruit " (
   COST INT DEFAULT NULL,
   GRADE REAL DEFAULT NULL
 )")])
-        (let [created (atom false)]
+            (let [created (atom false)]
           ;; MS SQL Server does not support bool/boolean:
-          (doseq [btype ["BOOL" "BOOLEAN" "BIT"]]
+              (doseq [btype ["BOOL" "BOOLEAN" "BIT"]]
             ;; Derby does not support bit:
-            (doseq [bitty ["BIT" "SMALLINT"]]
-              (try
-                (when-not @created
-                  (do-commands con [(str "
+                (doseq [bitty ["BIT" "SMALLINT"]]
+                  (try
+                    (when-not @created
+                      (do-commands con [(str "
 CREATE TABLE " btest " (
   NAME VARCHAR(32),
   IS_IT " btype ",
   TWIDDLE " bitty "
 )")])
-                  (reset! created true))
-                (catch Throwable _))))
-          (when-not @created
-            (println (:dbtype db) "failed btest creation")
-            #_(throw (ex-info (str (:dbtype db) " has no boolean type?") {}))))
-        (when (stored-proc?)
-          (let [[begin end] (if (postgres?) ["$$" "$$"] ["BEGIN" "END"])]
-            (try
-              (do-commands con [(str "
+                      (reset! created true))
+                    (catch Throwable _))))
+              (when-not @created
+                (println (:dbtype db) "failed btest creation")
+                #_(throw (ex-info (str (:dbtype db) " has no boolean type?") {}))))
+            (when (stored-proc?)
+              (let [[begin end] (if (postgres?) ["$$" "$$"] ["BEGIN" "END"])]
+                (try
+                  (do-commands con [(str "
 CREATE PROCEDURE FRUITP" (cond (hsqldb?) "() READS SQL DATA DYNAMIC RESULT SETS 2 "
                                (mssql?) " AS "
                                (postgres?) "() LANGUAGE SQL AS "
@@ -223,15 +266,15 @@ CREATE PROCEDURE FRUITP" (cond (hsqldb?) "() READS SQL DATA DYNAMIC RESULT SETS 
   SELECT * FROM " fruit " WHERE GRADE >= 90.0;")) "
  " end "
 ")])
-              (catch Throwable t
-                (println 'procedure (:dbtype db) (ex-message t))))))
-       (sql/insert-multi! con :fruit
-                          [:name :appearance :cost :grade]
-                          [["Apple" "red" 59 nil]
-                           ["Banana" "yellow" nil 92.2]
-                           ["Peach" nil 139 90.0]
-                           ["Orange" "juicy" 89 88.6]]
-                          {:return-keys false})
+                  (catch Throwable t
+                    (println 'procedure (:dbtype db) (ex-message t))))))
+            (sql/insert-multi! con :fruit
+                               [:name :appearance :cost :grade]
+                               [["Apple" "red" 59 nil]
+                                ["Banana" "yellow" nil 92.2]
+                                ["Peach" nil 139 90.0]
+                                ["Orange" "juicy" 89 88.6]]
+                               {:return-keys false})))
        (t)))))
 
 (create-clojure-test)

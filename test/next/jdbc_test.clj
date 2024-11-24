@@ -2,22 +2,24 @@
 
 (ns next.jdbc-test
   "Basic tests for the primary API of `next.jdbc`."
-  (:require [clojure.core.reducers :as r]
-            [clojure.string :as str]
-            [clojure.test :refer [deftest is testing use-fixtures]]
-            [next.jdbc :as jdbc]
-            [next.jdbc.connection :as c]
-            [next.jdbc.test-fixtures
-             :refer [with-test-db db ds column
-                     default-options stored-proc?
-                     derby? hsqldb? jtds? mssql? mysql? postgres? sqlite?]]
-            [next.jdbc.prepare :as prep]
-            [next.jdbc.result-set :as rs]
-            [next.jdbc.specs :as specs]
-            [next.jdbc.types :as types])
-  (:import (com.zaxxer.hikari HikariDataSource)
-           (com.mchange.v2.c3p0 ComboPooledDataSource PooledDataSource)
-           (java.sql ResultSet ResultSetMetaData)))
+  (:require
+   [clojure.core.reducers :as r]
+   [clojure.string :as str]
+   [clojure.test :refer [deftest is testing use-fixtures]]
+   [next.jdbc :as jdbc]
+   [next.jdbc.connection :as c]
+   [next.jdbc.prepare :as prep]
+   [next.jdbc.result-set :as rs]
+   [next.jdbc.specs :as specs]
+   [next.jdbc.test-fixtures
+             :refer [col-kw column db default-options derby? ds hsqldb? index
+                     jtds? mssql? mysql? postgres? sqlite? stored-proc?
+                     with-test-db xtdb?]]
+   [next.jdbc.types :as types])
+  (:import
+   (com.mchange.v2.c3p0 ComboPooledDataSource PooledDataSource)
+   (com.zaxxer.hikari HikariDataSource)
+   (java.sql ResultSet ResultSetMetaData)))
 
 (set! *warn-on-reflection* true)
 
@@ -60,27 +62,27 @@
                       (jdbc/execute-one!
                        ds-opts
                        ["select * from fruit where appearance = ?" "red"]))))
-      (is (= "red" (:fruit/looks-like
+      (is (= "red" ((col-kw :fruit/looks-like)
                     (jdbc/execute-one!
                      ds-opts
-                     ["select appearance as looks_like from fruit where id = ?" 1]
+                     [(str "select appearance as looks_like from fruit where " (index) " = ?") 1]
                      jdbc/snake-kebab-opts))))
       (let [ds' (jdbc/with-options ds-opts jdbc/snake-kebab-opts)]
-        (is (= "red" (:fruit/looks-like
+        (is (= "red" ((col-kw :fruit/looks-like)
                       (jdbc/execute-one!
                        ds'
-                       ["select appearance as looks_like from fruit where id = ?" 1])))))
+                       [(str "select appearance as looks_like from fruit where " (index) " = ?") 1])))))
       (jdbc/with-transaction+options [ds' (jdbc/with-options ds-opts jdbc/snake-kebab-opts)]
         (is (= (merge (default-options) jdbc/snake-kebab-opts)
                (:options ds')))
-        (is (= "red" (:fruit/looks-like
+        (is (= "red" ((col-kw :fruit/looks-like)
                       (jdbc/execute-one!
                        ds'
-                       ["select appearance as looks_like from fruit where id = ?" 1])))))
+                       [(str "select appearance as looks_like from fruit where " (index) " = ?") 1])))))
       (is (= "red" (:looks-like
                     (jdbc/execute-one!
                      ds-opts
-                     ["select appearance as looks_like from fruit where id = ?" 1]
+                     [(str "select appearance as looks_like from fruit where " (index) " = ?") 1]
                      jdbc/unqualified-snake-kebab-opts)))))
     (testing "execute!"
       (let [rs (jdbc/execute!
@@ -95,7 +97,7 @@
         (is (= 1 ((column :FRUIT/ID) (first rs)))))
       (let [rs (jdbc/execute!
                 ds-opts
-                ["select * from fruit order by id"]
+                [(str "select * from fruit order by " (index))]
                 {:builder-fn rs/as-maps})]
         (is (every? map? rs))
         (is (every? meta rs))
@@ -104,22 +106,26 @@
         (is (= 4 ((column :FRUIT/ID) (last rs)))))
       (let [rs (jdbc/execute!
                 ds-opts
-                ["select * from fruit order by id"]
+                [(str "select * from fruit order by " (index))]
                 {:builder-fn rs/as-arrays})]
         (is (every? vector? rs))
         (is (= 5 (count rs)))
         (is (every? #(= 5 (count %)) rs))
         ;; columns come first
-        (is (every? qualified-keyword? (first rs)))
+        (is (every? (if (xtdb?) keyword? qualified-keyword?) (first rs)))
         ;; :FRUIT/ID should be first column
         (is (= (column :FRUIT/ID) (ffirst rs)))
         ;; and all its corresponding values should be ints
         (is (every? int? (map first (rest rs))))
-        (is (every? string? (map second (rest rs))))))
+        (when (xtdb?) (println (first rs)
+                               (.indexOf ^java.util.List (first rs) :name)
+                               (.indexOf (first rs) :name)))
+        (let [n (.indexOf ^java.util.List (first rs) :name)]
+          (is (every? string? (map #(nth % n) (rest rs)))))))
     (testing "execute! with adapter"
       (let [rs (jdbc/execute! ; test again, with adapter and lower columns
                 ds-opts
-                ["select * from fruit order by id"]
+                [(str "select * from fruit order by " (index))]
                 {:builder-fn (rs/as-arrays-adapter
                               rs/as-lower-arrays
                               (fn [^ResultSet rs _ ^Integer i]
@@ -128,16 +134,20 @@
         (is (= 5 (count rs)))
         (is (every? #(= 5 (count %)) rs))
         ;; columns come first
-        (is (every? qualified-keyword? (first rs)))
+        (is (every? (if (xtdb?) keyword? qualified-keyword?) (first rs)))
         ;; :fruit/id should be first column
-        (is (= :fruit/id (ffirst rs)))
+        (is (= (col-kw :fruit/id) (ffirst rs)))
         ;; and all its corresponding values should be ints
         (is (every? int? (map first (rest rs))))
-        (is (every? string? (map second (rest rs))))))
+        (when (xtdb?) (println (first rs)
+                               (.indexOf ^java.util.List (first rs) :name)
+                               (.indexOf (first rs) :name)))
+        (let [n (.indexOf ^java.util.List (first rs) :name)]
+          (is (every? string? (map #(nth % n) (rest rs)))))))
     (testing "execute! with unqualified"
       (let [rs (jdbc/execute!
                 (ds)
-                ["select * from fruit order by id"]
+                [(str "select * from fruit order by " (index))]
                 {:builder-fn rs/as-unqualified-maps})]
         (is (every? map? rs))
         (is (every? meta rs))
@@ -146,7 +156,7 @@
         (is (= 4 ((column :ID) (last rs)))))
       (let [rs (jdbc/execute!
                 ds-opts
-                ["select * from fruit order by id"]
+                [(str "select * from fruit order by " (index))]
                 {:builder-fn rs/as-unqualified-arrays})]
         (is (every? vector? rs))
         (is (= 5 (count rs)))
@@ -157,11 +167,15 @@
         (is (= (column :ID) (ffirst rs)))
         ;; and all its corresponding values should be ints
         (is (every? int? (map first (rest rs))))
-        (is (every? string? (map second (rest rs))))))
+        (when (xtdb?) (println (first rs)
+                               (.indexOf ^java.util.List (first rs) :name)
+                               (.indexOf (first rs) :name)))
+        (let [n (.indexOf ^java.util.List (first rs) :name)]
+          (is (every? string? (map #(nth % n) (rest rs)))))))
     (testing "execute! with :max-rows / :maxRows"
       (let [rs (jdbc/execute!
                 ds-opts
-                ["select * from fruit order by id"]
+                [(str "select * from fruit order by " (index))]
                 {:max-rows 2})]
         (is (every? map? rs))
         (is (every? meta rs))
@@ -170,7 +184,7 @@
         (is (= 2 ((column :FRUIT/ID) (last rs)))))
       (let [rs (jdbc/execute!
                 ds-opts
-                ["select * from fruit order by id"]
+                [(str "select * from fruit order by " (index))]
                 {:statement {:maxRows 2}})]
         (is (every? map? rs))
         (is (every? meta rs))
@@ -182,7 +196,7 @@
     (let [rs (with-open [con (jdbc/get-connection (ds))
                          ps  (jdbc/prepare
                               con
-                              ["select * from fruit order by id"]
+                              [(str "select * from fruit order by " (index))]
                               (default-options))]
                  (jdbc/execute! ps))]
       (is (every? map? rs))
@@ -194,7 +208,7 @@
     (let [rs (with-open [con (jdbc/get-connection (ds))
                          ps  (jdbc/prepare
                               con
-                              ["select * from fruit where id = ?"]
+                              [(str "select * from fruit where " (index) " = ?")]
                               (default-options))]
                  (jdbc/execute! (prep/set-parameters ps [4]) nil {}))]
       (is (every? map? rs))
@@ -205,7 +219,8 @@
     ;; default options do not flow over get-connection
     (let [rs (with-open [con (jdbc/get-connection (ds))]
                (jdbc/execute! (prep/statement con (default-options))
-                              ["select * from fruit order by id"]))]
+                              [(str "select * from fruit order by " (index))]))]
+      (when (xtdb?) (println rs))
       (is (every? map? rs))
       (is (every? meta rs))
       (is (= 4 (count rs)))
@@ -214,151 +229,153 @@
     ;; default options do not flow over get-connection
     (let [rs (with-open [con (jdbc/get-connection (ds))]
                (jdbc/execute! (prep/statement con (default-options))
-                              ["select * from fruit where id = 4"]))]
+                              [(str "select * from fruit where " (index) " = 4")]))]
+      (when (xtdb?) (println rs))
       (is (every? map? rs))
       (is (every? meta rs))
       (is (= 1 (count rs)))
       (is (= 4 ((column :FRUIT/ID) (first rs))))))
-  (testing "transact"
-    (is (= [{:next.jdbc/update-count 1}]
-           (jdbc/transact (ds)
-                          (fn [t] (jdbc/execute! t ["
+  (when-not (xtdb?)
+    (testing "transact"
+      (is (= [{:next.jdbc/update-count 1}]
+             (jdbc/transact (ds)
+                            (fn [t] (jdbc/execute! t ["
 INSERT INTO fruit (name, appearance, cost, grade)
 VALUES ('Pear', 'green', 49, 47)
 "]))
-                          {:rollback-only true})))
-    (is (= 4 (count (jdbc/execute! (ds) ["select * from fruit"])))))
-  (testing "with-transaction rollback-only"
-    (is (not (jdbc/active-tx?)) "should not be in a transaction")
-    (is (= [{:next.jdbc/update-count 1}]
-           (jdbc/with-transaction [t (ds) {:rollback-only true}]
-             (is (jdbc/active-tx?) "should be in a transaction")
-             (is (jdbc/active-tx? t) "connection should be in a transaction")
-             (jdbc/execute! t ["
+                            {:rollback-only true})))
+      (is (= 4 (count (jdbc/execute! (ds) ["select * from fruit"])))))
+    (testing "with-transaction rollback-only"
+      (is (not (jdbc/active-tx?)) "should not be in a transaction")
+      (is (= [{:next.jdbc/update-count 1}]
+             (jdbc/with-transaction [t (ds) {:rollback-only true}]
+               (is (jdbc/active-tx?) "should be in a transaction")
+               (is (jdbc/active-tx? t) "connection should be in a transaction")
+               (jdbc/execute! t ["
 INSERT INTO fruit (name, appearance, cost, grade)
 VALUES ('Pear', 'green', 49, 47)
 "]))))
-    (is (= 4 (count (jdbc/execute! (ds) ["select * from fruit"]))))
-    (is (not (jdbc/active-tx?)) "should not be in a transaction")
-    (with-open [con (jdbc/get-connection (ds))]
-      (let [ac (.getAutoCommit con)]
-        (is (= [{:next.jdbc/update-count 1}]
-               (jdbc/with-transaction [t con {:rollback-only true}]
-                 (is (jdbc/active-tx?) "should be in a transaction")
-                 (is (jdbc/active-tx? t) "connection should be in a transaction")
-                 (jdbc/execute! t ["
+      (is (= 4 (count (jdbc/execute! (ds) ["select * from fruit"]))))
+      (is (not (jdbc/active-tx?)) "should not be in a transaction")
+      (with-open [con (jdbc/get-connection (ds))]
+        (let [ac (.getAutoCommit con)]
+          (is (= [{:next.jdbc/update-count 1}]
+                 (jdbc/with-transaction [t con {:rollback-only true}]
+                   (is (jdbc/active-tx?) "should be in a transaction")
+                   (is (jdbc/active-tx? t) "connection should be in a transaction")
+                   (jdbc/execute! t ["
 INSERT INTO fruit (name, appearance, cost, grade)
 VALUES ('Pear', 'green', 49, 47)
 "]))))
-        (is (= 4 (count (jdbc/execute! con ["select * from fruit"]))))
-        (is (= ac (.getAutoCommit con))))))
-  (testing "with-transaction exception"
-    (is (thrown? Throwable
-           (jdbc/with-transaction [t (ds)]
-             (jdbc/execute! t ["
+          (is (= 4 (count (jdbc/execute! con ["select * from fruit"]))))
+          (is (= ac (.getAutoCommit con))))))
+    (testing "with-transaction exception"
+      (is (thrown? Throwable
+                   (jdbc/with-transaction [t (ds)]
+                     (jdbc/execute! t ["
 INSERT INTO fruit (name, appearance, cost, grade)
 VALUES ('Pear', 'green', 49, 47)
 "])
-             (is (jdbc/active-tx?) "should be in a transaction")
-             (is (jdbc/active-tx? t) "connection should be in a transaction")
-             (throw (ex-info "abort" {})))))
-    (is (= 4 (count (jdbc/execute! (ds) ["select * from fruit"]))))
-    (is (not (jdbc/active-tx?)) "should not be in a transaction")
-    (with-open [con (jdbc/get-connection (ds))]
-      (let [ac (.getAutoCommit con)]
-        (is (thrown? Throwable
-               (jdbc/with-transaction [t con]
-                 (jdbc/execute! t ["
+                     (is (jdbc/active-tx?) "should be in a transaction")
+                     (is (jdbc/active-tx? t) "connection should be in a transaction")
+                     (throw (ex-info "abort" {})))))
+      (is (= 4 (count (jdbc/execute! (ds) ["select * from fruit"]))))
+      (is (not (jdbc/active-tx?)) "should not be in a transaction")
+      (with-open [con (jdbc/get-connection (ds))]
+        (let [ac (.getAutoCommit con)]
+          (is (thrown? Throwable
+                       (jdbc/with-transaction [t con]
+                         (jdbc/execute! t ["
 INSERT INTO fruit (name, appearance, cost, grade)
 VALUES ('Pear', 'green', 49, 47)
 "])
-                 (is (jdbc/active-tx?) "should be in a transaction")
-                 (is (jdbc/active-tx? t) "connection should be in a transaction")
-                 (throw (ex-info "abort" {})))))
-        (is (= 4 (count (jdbc/execute! con ["select * from fruit"]))))
-        (is (= ac (.getAutoCommit con))))))
-  (testing "with-transaction call rollback"
-    (is (= [{:next.jdbc/update-count 1}]
-           (jdbc/with-transaction [t (ds)]
-             (let [result (jdbc/execute! t ["
+                         (is (jdbc/active-tx?) "should be in a transaction")
+                         (is (jdbc/active-tx? t) "connection should be in a transaction")
+                         (throw (ex-info "abort" {})))))
+          (is (= 4 (count (jdbc/execute! con ["select * from fruit"]))))
+          (is (= ac (.getAutoCommit con))))))
+    (testing "with-transaction call rollback"
+      (is (= [{:next.jdbc/update-count 1}]
+             (jdbc/with-transaction [t (ds)]
+               (let [result (jdbc/execute! t ["
 INSERT INTO fruit (name, appearance, cost, grade)
 VALUES ('Pear', 'green', 49, 47)
 "])]
-               (.rollback t)
+                 (.rollback t)
                ;; still in a next.jdbc TX even tho' we rolled back!
-               (is (jdbc/active-tx?) "should be in a transaction")
-               (is (jdbc/active-tx? t) "connection should be in a transaction")
-               result))))
-    (is (= 4 (count (jdbc/execute! (ds) ["select * from fruit"]))))
-    (is (not (jdbc/active-tx?)) "should not be in a transaction")
-    (with-open [con (jdbc/get-connection (ds))]
-      (let [ac (.getAutoCommit con)]
-        (is (= [{:next.jdbc/update-count 1}]
-               (jdbc/with-transaction [t con]
-                 (let [result (jdbc/execute! t ["
+                 (is (jdbc/active-tx?) "should be in a transaction")
+                 (is (jdbc/active-tx? t) "connection should be in a transaction")
+                 result))))
+      (is (= 4 (count (jdbc/execute! (ds) ["select * from fruit"]))))
+      (is (not (jdbc/active-tx?)) "should not be in a transaction")
+      (with-open [con (jdbc/get-connection (ds))]
+        (let [ac (.getAutoCommit con)]
+          (is (= [{:next.jdbc/update-count 1}]
+                 (jdbc/with-transaction [t con]
+                   (let [result (jdbc/execute! t ["
 INSERT INTO fruit (name, appearance, cost, grade)
 VALUES ('Pear', 'green', 49, 47)
 "])]
-                   (.rollback t)
-                   result))))
-        (is (= 4 (count (jdbc/execute! con ["select * from fruit"]))))
-        (is (= ac (.getAutoCommit con))))))
-  (testing "with-transaction with unnamed save point"
-    (is (= [{:next.jdbc/update-count 1}]
-           (jdbc/with-transaction [t (ds)]
-             (let [save-point (.setSavepoint t)
-                   result (jdbc/execute! t ["
+                     (.rollback t)
+                     result))))
+          (is (= 4 (count (jdbc/execute! con ["select * from fruit"]))))
+          (is (= ac (.getAutoCommit con))))))
+    (testing "with-transaction with unnamed save point"
+      (is (= [{:next.jdbc/update-count 1}]
+             (jdbc/with-transaction [t (ds)]
+               (let [save-point (.setSavepoint t)
+                     result (jdbc/execute! t ["
 INSERT INTO fruit (name, appearance, cost, grade)
 VALUES ('Pear', 'green', 49, 47)
 "])]
-               (.rollback t save-point)
+                 (.rollback t save-point)
                ;; still in a next.jdbc TX even tho' we rolled back to a save point!
-               (is (jdbc/active-tx?) "should be in a transaction")
-               (is (jdbc/active-tx? t) "connection should be in a transaction")
-               result))))
-    (is (= 4 (count (jdbc/execute! (ds) ["select * from fruit"]))))
-    (is (not (jdbc/active-tx?)) "should not be in a transaction")
-    (with-open [con (jdbc/get-connection (ds))]
-      (let [ac (.getAutoCommit con)]
-        (is (= [{:next.jdbc/update-count 1}]
-               (jdbc/with-transaction [t con]
-                 (let [save-point (.setSavepoint t)
-                       result (jdbc/execute! t ["
+                 (is (jdbc/active-tx?) "should be in a transaction")
+                 (is (jdbc/active-tx? t) "connection should be in a transaction")
+                 result))))
+      (is (= 4 (count (jdbc/execute! (ds) ["select * from fruit"]))))
+      (is (not (jdbc/active-tx?)) "should not be in a transaction")
+      (with-open [con (jdbc/get-connection (ds))]
+        (let [ac (.getAutoCommit con)]
+          (is (= [{:next.jdbc/update-count 1}]
+                 (jdbc/with-transaction [t con]
+                   (let [save-point (.setSavepoint t)
+                         result (jdbc/execute! t ["
 INSERT INTO fruit (name, appearance, cost, grade)
 VALUES ('Pear', 'green', 49, 47)
 "])]
-                   (.rollback t save-point)
-                   result))))
-        (is (= 4 (count (jdbc/execute! con ["select * from fruit"]))))
-        (is (= ac (.getAutoCommit con))))))
-  (testing "with-transaction with named save point"
-    (is (= [{:next.jdbc/update-count 1}]
-           (jdbc/with-transaction [t (ds)]
-             (let [save-point (.setSavepoint t (name (gensym)))
-                   result (jdbc/execute! t ["
+                     (.rollback t save-point)
+                     result))))
+          (is (= 4 (count (jdbc/execute! con ["select * from fruit"]))))
+          (is (= ac (.getAutoCommit con))))))
+    (testing "with-transaction with named save point"
+      (is (= [{:next.jdbc/update-count 1}]
+             (jdbc/with-transaction [t (ds)]
+               (let [save-point (.setSavepoint t (name (gensym)))
+                     result (jdbc/execute! t ["
 INSERT INTO fruit (name, appearance, cost, grade)
 VALUES ('Pear', 'green', 49, 47)
 "])]
-               (.rollback t save-point)
-               result))))
-    (is (= 4 (count (jdbc/execute! (ds) ["select * from fruit"]))))
-    (with-open [con (jdbc/get-connection (ds))]
-      (let [ac (.getAutoCommit con)]
-        (is (= [{:next.jdbc/update-count 1}]
-               (jdbc/with-transaction [t con]
-                 (let [save-point (.setSavepoint t (name (gensym)))
-                       result (jdbc/execute! t ["
+                 (.rollback t save-point)
+                 result))))
+      (is (= 4 (count (jdbc/execute! (ds) ["select * from fruit"]))))
+      (with-open [con (jdbc/get-connection (ds))]
+        (let [ac (.getAutoCommit con)]
+          (is (= [{:next.jdbc/update-count 1}]
+                 (jdbc/with-transaction [t con]
+                   (let [save-point (.setSavepoint t (name (gensym)))
+                         result (jdbc/execute! t ["
 INSERT INTO fruit (name, appearance, cost, grade)
 VALUES ('Pear', 'green', 49, 47)
 "])]
-                   (.rollback t save-point)
-                   result))))
-        (is (= 4 (count (jdbc/execute! con ["select * from fruit"]))))
-        (is (= ac (.getAutoCommit con)))))))
+                     (.rollback t save-point)
+                     result))))
+          (is (= 4 (count (jdbc/execute! con ["select * from fruit"]))))
+          (is (= ac (.getAutoCommit con))))))))
 
 (deftest issue-146
   ;; since we use an embedded PostgreSQL data source, we skip this:
-  (when-not (or (postgres?)
+  (when-not (or (postgres?) (xtdb?)
                 ;; and now we skip MS SQL because we can't use the db-spec
                 ;; we'd need to build the jdbcUrl with encryption turned off:
                 (and (mssql?) (not (jtds?))))
@@ -495,117 +512,82 @@ VALUES ('Pear', 'green', 49, 47)
                "\n\t" (ex-message t)))))
 
 (deftest bool-tests
-  (doseq [[n b] [["zero" 0] ["one" 1] ["false" false] ["true" true]]
-          :let [v-bit  (if (number? b) b (if b 1 0))
-                v-bool (if (number? b) (pos? b) b)]]
-    (jdbc/execute-one!
-     (ds)
-     ["insert into btest (name,is_it,twiddle) values (?,?,?)"
-      n
-      (if (postgres?)
-        (types/as-boolean b)
-        b) ; 0, 1, false, true are all acceptable
-      (cond (hsqldb?)
-            v-bool ; hsqldb requires a boolean here
-            (postgres?)
-            (types/as-other v-bit) ; really postgres??
-            :else
-            v-bit)]))
-  (let [data (jdbc/execute! (ds) ["select * from btest"]
-                            (default-options))]
-    (if (sqlite?)
-      (is (every? number?  (map (column :BTEST/IS_IT) data)))
-      (is (every? boolean? (map (column :BTEST/IS_IT) data))))
-    (if (or (sqlite?) (derby?))
-      (is (every? number?  (map (column :BTEST/TWIDDLE) data)))
-      (is (every? boolean? (map (column :BTEST/TWIDDLE) data)))))
-  (let [data (jdbc/execute! (ds) ["select * from btest"]
-                            (cond-> (default-options)
-                              (sqlite?)
-                              (assoc :builder-fn
-                                     (rs/builder-adapter
-                                      rs/as-maps
-                                      (fn [builder ^ResultSet rs ^Integer i]
-                                        (let [rsm ^ResultSetMetaData (:rsmeta builder)]
-                                          (rs/read-column-by-index
+  (when-not (xtdb?)
+    (doseq [[n b] [["zero" 0] ["one" 1] ["false" false] ["true" true]]
+            :let [v-bit  (if (number? b) b (if b 1 0))
+                  v-bool (if (number? b) (pos? b) b)]]
+      (jdbc/execute-one!
+       (ds)
+       ["insert into btest (name,is_it,twiddle) values (?,?,?)"
+        n
+        (if (postgres?)
+          (types/as-boolean b)
+          b) ; 0, 1, false, true are all acceptable
+        (cond (hsqldb?)
+              v-bool ; hsqldb requires a boolean here
+              (postgres?)
+              (types/as-other v-bit) ; really postgres??
+              :else
+              v-bit)]))
+    (let [data (jdbc/execute! (ds) ["select * from btest"]
+                              (default-options))]
+      (if (sqlite?)
+        (is (every? number?  (map (column :BTEST/IS_IT) data)))
+        (is (every? boolean? (map (column :BTEST/IS_IT) data))))
+      (if (or (sqlite?) (derby?))
+        (is (every? number?  (map (column :BTEST/TWIDDLE) data)))
+        (is (every? boolean? (map (column :BTEST/TWIDDLE) data)))))
+    (let [data (jdbc/execute! (ds) ["select * from btest"]
+                              (cond-> (default-options)
+                                (sqlite?)
+                                (assoc :builder-fn
+                                       (rs/builder-adapter
+                                        rs/as-maps
+                                        (fn [builder ^ResultSet rs ^Integer i]
+                                          (let [rsm ^ResultSetMetaData (:rsmeta builder)]
+                                            (rs/read-column-by-index
                                            ;; we only use bit and bool for
                                            ;; sqlite (not boolean)
-                                           (if (#{"BIT" "BOOL"} (.getColumnTypeName rsm i))
-                                             (.getBoolean rs i)
-                                             (.getObject rs i))
-                                           rsm
-                                           i)))))))]
-    (is (every? boolean? (map (column :BTEST/IS_IT) data)))
-    (if (derby?)
-      (is (every? number?  (map (column :BTEST/TWIDDLE) data)))
-      (is (every? boolean? (map (column :BTEST/TWIDDLE) data)))))
-  (let [data (reduce (fn [acc row]
-                       (conj acc (cond-> (select-keys row [:is_it :twiddle])
-                                   (sqlite?)
-                                   (update :is_it pos?)
-                                   (or (sqlite?) (derby?))
-                                   (update :twiddle pos?))))
-                     []
-                     (jdbc/plan (ds) ["select * from btest"]))]
-    (is (every? boolean? (map :is_it data)))
-    (is (every? boolean? (map :twiddle data)))))
+                                             (if (#{"BIT" "BOOL"} (.getColumnTypeName rsm i))
+                                               (.getBoolean rs i)
+                                               (.getObject rs i))
+                                             rsm
+                                             i)))))))]
+      (is (every? boolean? (map (column :BTEST/IS_IT) data)))
+      (if (derby?)
+        (is (every? number?  (map (column :BTEST/TWIDDLE) data)))
+        (is (every? boolean? (map (column :BTEST/TWIDDLE) data)))))
+    (let [data (reduce (fn [acc row]
+                         (conj acc (cond-> (select-keys row [:is_it :twiddle])
+                                     (sqlite?)
+                                     (update :is_it pos?)
+                                     (or (sqlite?) (derby?))
+                                     (update :twiddle pos?))))
+                       []
+                       (jdbc/plan (ds) ["select * from btest"]))]
+      (is (every? boolean? (map :is_it data)))
+      (is (every? boolean? (map :twiddle data))))))
 
 (deftest execute-batch-tests
-  (testing "simple batch insert"
-    (is (= [1 1 1 1 1 1 1 1 1 13]
-           (jdbc/with-transaction [t (ds) {:rollback-only true}]
-             (with-open [ps (jdbc/prepare t ["
+  (when-not (xtdb?)
+    (testing "simple batch insert"
+      (is (= [1 1 1 1 1 1 1 1 1 13]
+             (jdbc/with-transaction [t (ds) {:rollback-only true}]
+               (with-open [ps (jdbc/prepare t ["
 INSERT INTO fruit (name, appearance) VALUES (?,?)
 "])]
-               (let [result (jdbc/execute-batch! ps [["fruit1" "one"]
-                                                     ["fruit2" "two"]
-                                                     ["fruit3" "three"]
-                                                     ["fruit4" "four"]
-                                                     ["fruit5" "five"]
-                                                     ["fruit6" "six"]
-                                                     ["fruit7" "seven"]
-                                                     ["fruit8" "eight"]
-                                                     ["fruit9" "nine"]])]
-                 (conj result (count (jdbc/execute! t ["select * from fruit"]))))))))
-    (is (= 4 (count (jdbc/execute! (ds) ["select * from fruit"])))))
-  (testing "small batch insert"
-    (is (= [1 1 1 1 1 1 1 1 1 13]
-           (jdbc/with-transaction [t (ds) {:rollback-only true}]
-             (with-open [ps (jdbc/prepare t ["
-INSERT INTO fruit (name, appearance) VALUES (?,?)
-"])]
-               (let [result (jdbc/execute-batch! ps [["fruit1" "one"]
-                                                     ["fruit2" "two"]
-                                                     ["fruit3" "three"]
-                                                     ["fruit4" "four"]
-                                                     ["fruit5" "five"]
-                                                     ["fruit6" "six"]
-                                                     ["fruit7" "seven"]
-                                                     ["fruit8" "eight"]
-                                                     ["fruit9" "nine"]]
-                                                 {:batch-size 3})]
-                 (conj result (count (jdbc/execute! t ["select * from fruit"]))))))))
-    (is (= 4 (count (jdbc/execute! (ds) ["select * from fruit"])))))
-  (testing "big batch insert"
-    (is (= [1 1 1 1 1 1 1 1 1 13]
-           (jdbc/with-transaction [t (ds) {:rollback-only true}]
-             (with-open [ps (jdbc/prepare t ["
-INSERT INTO fruit (name, appearance) VALUES (?,?)
-"])]
-               (let [result (jdbc/execute-batch! ps [["fruit1" "one"]
-                                                     ["fruit2" "two"]
-                                                     ["fruit3" "three"]
-                                                     ["fruit4" "four"]
-                                                     ["fruit5" "five"]
-                                                     ["fruit6" "six"]
-                                                     ["fruit7" "seven"]
-                                                     ["fruit8" "eight"]
-                                                     ["fruit9" "nine"]]
-                                                 {:batch-size 8})]
-                 (conj result (count (jdbc/execute! t ["select * from fruit"]))))))))
-    (is (= 4 (count (jdbc/execute! (ds) ["select * from fruit"])))))
-  (testing "large batch insert"
-    (when-not (or (jtds?) (sqlite?))
+                 (let [result (jdbc/execute-batch! ps [["fruit1" "one"]
+                                                       ["fruit2" "two"]
+                                                       ["fruit3" "three"]
+                                                       ["fruit4" "four"]
+                                                       ["fruit5" "five"]
+                                                       ["fruit6" "six"]
+                                                       ["fruit7" "seven"]
+                                                       ["fruit8" "eight"]
+                                                       ["fruit9" "nine"]])]
+                   (conj result (count (jdbc/execute! t ["select * from fruit"]))))))))
+      (is (= 4 (count (jdbc/execute! (ds) ["select * from fruit"])))))
+    (testing "small batch insert"
       (is (= [1 1 1 1 1 1 1 1 1 13]
              (jdbc/with-transaction [t (ds) {:rollback-only true}]
                (with-open [ps (jdbc/prepare t ["
@@ -620,135 +602,77 @@ INSERT INTO fruit (name, appearance) VALUES (?,?)
                                                        ["fruit7" "seven"]
                                                        ["fruit8" "eight"]
                                                        ["fruit9" "nine"]]
-                                                   {:batch-size 4
-                                                    :large true})]
+                                                   {:batch-size 3})]
                    (conj result (count (jdbc/execute! t ["select * from fruit"]))))))))
-      (is (= 4 (count (jdbc/execute! (ds) ["select * from fruit"]))))))
-  (testing "return generated keys"
-    (when-not (or (mssql?) (sqlite?))
-      (let [results
-            (jdbc/with-transaction [t (ds) {:rollback-only true}]
-              (with-open [ps (jdbc/prepare t ["
+      (is (= 4 (count (jdbc/execute! (ds) ["select * from fruit"])))))
+    (testing "big batch insert"
+      (is (= [1 1 1 1 1 1 1 1 1 13]
+             (jdbc/with-transaction [t (ds) {:rollback-only true}]
+               (with-open [ps (jdbc/prepare t ["
+INSERT INTO fruit (name, appearance) VALUES (?,?)
+"])]
+                 (let [result (jdbc/execute-batch! ps [["fruit1" "one"]
+                                                       ["fruit2" "two"]
+                                                       ["fruit3" "three"]
+                                                       ["fruit4" "four"]
+                                                       ["fruit5" "five"]
+                                                       ["fruit6" "six"]
+                                                       ["fruit7" "seven"]
+                                                       ["fruit8" "eight"]
+                                                       ["fruit9" "nine"]]
+                                                   {:batch-size 8})]
+                   (conj result (count (jdbc/execute! t ["select * from fruit"]))))))))
+      (is (= 4 (count (jdbc/execute! (ds) ["select * from fruit"])))))
+    (testing "large batch insert"
+      (when-not (or (jtds?) (sqlite?))
+        (is (= [1 1 1 1 1 1 1 1 1 13]
+               (jdbc/with-transaction [t (ds) {:rollback-only true}]
+                 (with-open [ps (jdbc/prepare t ["
+INSERT INTO fruit (name, appearance) VALUES (?,?)
+"])]
+                   (let [result (jdbc/execute-batch! ps [["fruit1" "one"]
+                                                         ["fruit2" "two"]
+                                                         ["fruit3" "three"]
+                                                         ["fruit4" "four"]
+                                                         ["fruit5" "five"]
+                                                         ["fruit6" "six"]
+                                                         ["fruit7" "seven"]
+                                                         ["fruit8" "eight"]
+                                                         ["fruit9" "nine"]]
+                                                     {:batch-size 4
+                                                      :large true})]
+                     (conj result (count (jdbc/execute! t ["select * from fruit"]))))))))
+        (is (= 4 (count (jdbc/execute! (ds) ["select * from fruit"]))))))
+    (testing "return generated keys"
+      (when-not (or (mssql?) (sqlite?))
+        (let [results
+              (jdbc/with-transaction [t (ds) {:rollback-only true}]
+                (with-open [ps (jdbc/prepare t ["
 INSERT INTO fruit (name, appearance) VALUES (?,?)
 "]
-                                           {:return-keys true})]
-                (let [result (jdbc/execute-batch! ps [["fruit1" "one"]
-                                                      ["fruit2" "two"]
-                                                      ["fruit3" "three"]
-                                                      ["fruit4" "four"]
-                                                      ["fruit5" "five"]
-                                                      ["fruit6" "six"]
-                                                      ["fruit7" "seven"]
-                                                      ["fruit8" "eight"]
-                                                      ["fruit9" "nine"]]
-                                                  {:batch-size 4
-                                                   :return-generated-keys true})]
-                  (conj result (count (jdbc/execute! t ["select * from fruit"]))))))]
-        (is (= 13 (last results)))
-        (is (every? map? (butlast results)))
+                                             {:return-keys true})]
+                  (let [result (jdbc/execute-batch! ps [["fruit1" "one"]
+                                                        ["fruit2" "two"]
+                                                        ["fruit3" "three"]
+                                                        ["fruit4" "four"]
+                                                        ["fruit5" "five"]
+                                                        ["fruit6" "six"]
+                                                        ["fruit7" "seven"]
+                                                        ["fruit8" "eight"]
+                                                        ["fruit9" "nine"]]
+                                                    {:batch-size 4
+                                                     :return-generated-keys true})]
+                    (conj result (count (jdbc/execute! t ["select * from fruit"]))))))]
+          (is (= 13 (last results)))
+          (is (every? map? (butlast results)))
         ;; Derby and SQLite only return one generated key per batch so there
         ;; are only three keys, plus the overall count here:
-        (is (< 3 (count results))))
-      (is (= 4 (count (jdbc/execute! (ds) ["select * from fruit"])))))))
+          (is (< 3 (count results))))
+        (is (= 4 (count (jdbc/execute! (ds) ["select * from fruit"]))))))))
 
 (deftest execute-batch-connectable-tests
-  (testing "simple batch insert"
-    (is (= [1 1 1 1 1 1 1 1 1 13]
-           (try
-             (let [result (jdbc/execute-batch! (ds)
-                                               "INSERT INTO fruit (name, appearance) VALUES (?,?)"
-                                               [["fruit1" "one"]
-                                                ["fruit2" "two"]
-                                                ["fruit3" "three"]
-                                                ["fruit4" "four"]
-                                                ["fruit5" "five"]
-                                                ["fruit6" "six"]
-                                                ["fruit7" "seven"]
-                                                ["fruit8" "eight"]
-                                                ["fruit9" "nine"]]
-                                               {})]
-               (conj result (count (jdbc/execute! (ds) ["select * from fruit"]))))
-             (finally
-               (jdbc/execute-one! (ds) ["delete from fruit where id > 4"])))))
-    (is (= 4 (count (jdbc/execute! (ds) ["select * from fruit"])))))
-  (testing "batch with-options"
-    (is (= [1 1 1 1 1 1 1 1 1 13]
-           (try
-             (let [result (jdbc/execute-batch! (jdbc/with-options (ds) {})
-                                               "INSERT INTO fruit (name, appearance) VALUES (?,?)"
-                                               [["fruit1" "one"]
-                                                ["fruit2" "two"]
-                                                ["fruit3" "three"]
-                                                ["fruit4" "four"]
-                                                ["fruit5" "five"]
-                                                ["fruit6" "six"]
-                                                ["fruit7" "seven"]
-                                                ["fruit8" "eight"]
-                                                ["fruit9" "nine"]]
-                                               {})]
-               (conj result (count (jdbc/execute! (ds) ["select * from fruit"]))))
-             (finally
-               (jdbc/execute-one! (ds) ["delete from fruit where id > 4"])))))
-    (is (= 4 (count (jdbc/execute! (ds) ["select * from fruit"])))))
-  (testing "batch with-logging"
-    (is (= [1 1 1 1 1 1 1 1 1 13]
-           (try
-             (let [result (jdbc/execute-batch! (jdbc/with-logging (ds) println println)
-                                               "INSERT INTO fruit (name, appearance) VALUES (?,?)"
-                                               [["fruit1" "one"]
-                                                ["fruit2" "two"]
-                                                ["fruit3" "three"]
-                                                ["fruit4" "four"]
-                                                ["fruit5" "five"]
-                                                ["fruit6" "six"]
-                                                ["fruit7" "seven"]
-                                                ["fruit8" "eight"]
-                                                ["fruit9" "nine"]]
-                                               {})]
-               (conj result (count (jdbc/execute! (ds) ["select * from fruit"]))))
-             (finally
-               (jdbc/execute-one! (ds) ["delete from fruit where id > 4"])))))
-    (is (= 4 (count (jdbc/execute! (ds) ["select * from fruit"])))))
-  (testing "small batch insert"
-    (is (= [1 1 1 1 1 1 1 1 1 13]
-           (try
-             (let [result (jdbc/execute-batch! (ds)
-                                               "INSERT INTO fruit (name, appearance) VALUES (?,?)"
-                                               [["fruit1" "one"]
-                                                ["fruit2" "two"]
-                                                ["fruit3" "three"]
-                                                ["fruit4" "four"]
-                                                ["fruit5" "five"]
-                                                ["fruit6" "six"]
-                                                ["fruit7" "seven"]
-                                                ["fruit8" "eight"]
-                                                ["fruit9" "nine"]]
-                                               {:batch-size 3})]
-               (conj result (count (jdbc/execute! (ds) ["select * from fruit"]))))
-             (finally
-               (jdbc/execute-one! (ds) ["delete from fruit where id > 4"])))))
-    (is (= 4 (count (jdbc/execute! (ds) ["select * from fruit"])))))
-  (testing "big batch insert"
-    (is (= [1 1 1 1 1 1 1 1 1 13]
-           (try
-             (let [result (jdbc/execute-batch! (ds)
-                                               "INSERT INTO fruit (name, appearance) VALUES (?,?)"
-                                               [["fruit1" "one"]
-                                                ["fruit2" "two"]
-                                                ["fruit3" "three"]
-                                                ["fruit4" "four"]
-                                                ["fruit5" "five"]
-                                                ["fruit6" "six"]
-                                                ["fruit7" "seven"]
-                                                ["fruit8" "eight"]
-                                                ["fruit9" "nine"]]
-                                               {:batch-size 8})]
-               (conj result (count (jdbc/execute! (ds) ["select * from fruit"]))))
-             (finally
-               (jdbc/execute-one! (ds) ["delete from fruit where id > 4"])))))
-    (is (= 4 (count (jdbc/execute! (ds) ["select * from fruit"])))))
-  (testing "large batch insert"
-    (when-not (or (jtds?) (sqlite?))
+  (when-not (xtdb?)
+    (testing "simple batch insert"
       (is (= [1 1 1 1 1 1 1 1 1 13]
              (try
                (let [result (jdbc/execute-batch! (ds)
@@ -762,54 +686,154 @@ INSERT INTO fruit (name, appearance) VALUES (?,?)
                                                   ["fruit7" "seven"]
                                                   ["fruit8" "eight"]
                                                   ["fruit9" "nine"]]
-                                                 {:batch-size 4
-                                                  :large true})]
+                                                 {})]
                  (conj result (count (jdbc/execute! (ds) ["select * from fruit"]))))
                (finally
-                 (jdbc/execute-one! (ds) ["delete from fruit where id > 4"])))))
-      (is (= 4 (count (jdbc/execute! (ds) ["select * from fruit"]))))))
-  (testing "return generated keys"
-    (when-not (or (mssql?) (sqlite?))
-      (let [results
-            (try
-              (let [result (jdbc/execute-batch! (ds)
-                                                "INSERT INTO fruit (name, appearance) VALUES (?,?)"
-                                                [["fruit1" "one"]
-                                                 ["fruit2" "two"]
-                                                 ["fruit3" "three"]
-                                                 ["fruit4" "four"]
-                                                 ["fruit5" "five"]
-                                                 ["fruit6" "six"]
-                                                 ["fruit7" "seven"]
-                                                 ["fruit8" "eight"]
-                                                 ["fruit9" "nine"]]
+                 (jdbc/execute-one! (ds) [(str "delete from fruit where " (index) " > 4")])))))
+      (is (= 4 (count (jdbc/execute! (ds) ["select * from fruit"])))))
+    (testing "batch with-options"
+      (is (= [1 1 1 1 1 1 1 1 1 13]
+             (try
+               (let [result (jdbc/execute-batch! (jdbc/with-options (ds) {})
+                                                 "INSERT INTO fruit (name, appearance) VALUES (?,?)"
+                                                 [["fruit1" "one"]
+                                                  ["fruit2" "two"]
+                                                  ["fruit3" "three"]
+                                                  ["fruit4" "four"]
+                                                  ["fruit5" "five"]
+                                                  ["fruit6" "six"]
+                                                  ["fruit7" "seven"]
+                                                  ["fruit8" "eight"]
+                                                  ["fruit9" "nine"]]
+                                                 {})]
+                 (conj result (count (jdbc/execute! (ds) ["select * from fruit"]))))
+               (finally
+                 (jdbc/execute-one! (ds) [(str "delete from fruit where " (index) " > 4")])))))
+      (is (= 4 (count (jdbc/execute! (ds) ["select * from fruit"])))))
+    (testing "batch with-logging"
+      (is (= [1 1 1 1 1 1 1 1 1 13]
+             (try
+               (let [result (jdbc/execute-batch! (jdbc/with-logging (ds) println println)
+                                                 "INSERT INTO fruit (name, appearance) VALUES (?,?)"
+                                                 [["fruit1" "one"]
+                                                  ["fruit2" "two"]
+                                                  ["fruit3" "three"]
+                                                  ["fruit4" "four"]
+                                                  ["fruit5" "five"]
+                                                  ["fruit6" "six"]
+                                                  ["fruit7" "seven"]
+                                                  ["fruit8" "eight"]
+                                                  ["fruit9" "nine"]]
+                                                 {})]
+                 (conj result (count (jdbc/execute! (ds) ["select * from fruit"]))))
+               (finally
+                 (jdbc/execute-one! (ds) [(str "delete from fruit where " (index) " > 4")])))))
+      (is (= 4 (count (jdbc/execute! (ds) ["select * from fruit"])))))
+    (testing "small batch insert"
+      (is (= [1 1 1 1 1 1 1 1 1 13]
+             (try
+               (let [result (jdbc/execute-batch! (ds)
+                                                 "INSERT INTO fruit (name, appearance) VALUES (?,?)"
+                                                 [["fruit1" "one"]
+                                                  ["fruit2" "two"]
+                                                  ["fruit3" "three"]
+                                                  ["fruit4" "four"]
+                                                  ["fruit5" "five"]
+                                                  ["fruit6" "six"]
+                                                  ["fruit7" "seven"]
+                                                  ["fruit8" "eight"]
+                                                  ["fruit9" "nine"]]
+                                                 {:batch-size 3})]
+                 (conj result (count (jdbc/execute! (ds) ["select * from fruit"]))))
+               (finally
+                 (jdbc/execute-one! (ds) [(str "delete from fruit where " (index) " > 4")])))))
+      (is (= 4 (count (jdbc/execute! (ds) ["select * from fruit"])))))
+    (testing "big batch insert"
+      (is (= [1 1 1 1 1 1 1 1 1 13]
+             (try
+               (let [result (jdbc/execute-batch! (ds)
+                                                 "INSERT INTO fruit (name, appearance) VALUES (?,?)"
+                                                 [["fruit1" "one"]
+                                                  ["fruit2" "two"]
+                                                  ["fruit3" "three"]
+                                                  ["fruit4" "four"]
+                                                  ["fruit5" "five"]
+                                                  ["fruit6" "six"]
+                                                  ["fruit7" "seven"]
+                                                  ["fruit8" "eight"]
+                                                  ["fruit9" "nine"]]
+                                                 {:batch-size 8})]
+                 (conj result (count (jdbc/execute! (ds) ["select * from fruit"]))))
+               (finally
+                 (jdbc/execute-one! (ds) [(str "delete from fruit where " (index) " > 4")])))))
+      (is (= 4 (count (jdbc/execute! (ds) ["select * from fruit"])))))
+    (testing "large batch insert"
+      (when-not (or (jtds?) (sqlite?))
+        (is (= [1 1 1 1 1 1 1 1 1 13]
+               (try
+                 (let [result (jdbc/execute-batch! (ds)
+                                                   "INSERT INTO fruit (name, appearance) VALUES (?,?)"
+                                                   [["fruit1" "one"]
+                                                    ["fruit2" "two"]
+                                                    ["fruit3" "three"]
+                                                    ["fruit4" "four"]
+                                                    ["fruit5" "five"]
+                                                    ["fruit6" "six"]
+                                                    ["fruit7" "seven"]
+                                                    ["fruit8" "eight"]
+                                                    ["fruit9" "nine"]]
+                                                   {:batch-size 4
+                                                    :large true})]
+                   (conj result (count (jdbc/execute! (ds) ["select * from fruit"]))))
+                 (finally
+                   (jdbc/execute-one! (ds) [(str "delete from fruit where " (index) " > 4")])))))
+        (is (= 4 (count (jdbc/execute! (ds) ["select * from fruit"]))))))
+    (testing "return generated keys"
+      (when-not (or (mssql?) (sqlite?))
+        (let [results
+              (try
+                (let [result (jdbc/execute-batch! (ds)
+                                                  "INSERT INTO fruit (name, appearance) VALUES (?,?)"
+                                                  [["fruit1" "one"]
+                                                   ["fruit2" "two"]
+                                                   ["fruit3" "three"]
+                                                   ["fruit4" "four"]
+                                                   ["fruit5" "five"]
+                                                   ["fruit6" "six"]
+                                                   ["fruit7" "seven"]
+                                                   ["fruit8" "eight"]
+                                                   ["fruit9" "nine"]]
                                                 ;; note: we need both :return-keys true for creating
                                                 ;; the PreparedStatement and :return-generated-keys
                                                 ;; true to control the way batch execution happens:
-                                                {:batch-size 4 :return-keys true
-                                                 :return-generated-keys true})]
-                (conj result (count (jdbc/execute! (ds) ["select * from fruit"]))))
-              (finally
-                (jdbc/execute-one! (ds) ["delete from fruit where id > 4"])))]
-        (is (= 13 (last results)))
-        (is (every? map? (butlast results)))
+                                                  {:batch-size 4 :return-keys true
+                                                   :return-generated-keys true})]
+                  (conj result (count (jdbc/execute! (ds) ["select * from fruit"]))))
+                (finally
+                  (jdbc/execute-one! (ds) [(str "delete from fruit where " (index) " > 4")])))]
+          (is (= 13 (last results)))
+          (is (every? map? (butlast results)))
         ;; Derby and SQLite only return one generated key per batch so there
         ;; are only three keys, plus the overall count here:
-        (is (< 3 (count results))))
-      (is (= 4 (count (jdbc/execute! (ds) ["select * from fruit"])))))))
+          (is (< 3 (count results))))
+        (is (= 4 (count (jdbc/execute! (ds) ["select * from fruit"]))))))))
 
 (deftest folding-test
   (jdbc/execute-one! (ds) ["delete from fruit"])
-  (with-open [con (jdbc/get-connection (ds))
-              ps  (jdbc/prepare con ["insert into fruit(name) values (?)"])]
-    (jdbc/execute-batch! ps (mapv #(vector (str "Fruit-" %)) (range 1 1001))))
+  (if (xtdb?)
+    (with-open [con (jdbc/get-connection (ds))
+                ps  (jdbc/prepare con ["insert into fruit(_id,name) values (?,?)"])]
+      (jdbc/execute-batch! ps (mapv #(vector % (str "Fruit-" %)) (range 1 1001))))
+    (with-open [con (jdbc/get-connection (ds))
+                ps  (jdbc/prepare con ["insert into fruit(name) values (?)"])]
+      (jdbc/execute-batch! ps (mapv #(vector (str "Fruit-" %)) (range 1 1001)))))
   (testing "foldable result set"
     (testing "from a Connection"
       (let [result
             (with-open [con (jdbc/get-connection (ds))]
               (r/foldcat
                (r/map (column :FRUIT/NAME)
-                      (jdbc/plan con ["select * from fruit order by id"]
+                      (jdbc/plan con [(str "select * from fruit order by " (index))]
                                  (default-options)))))]
         (is (= 1000 (count result)))
         (is (= "Fruit-1" (first result)))
@@ -821,7 +845,7 @@ INSERT INTO fruit (name, appearance) VALUES (?,?)
                 (try
                   (r/fold n r/cat r/append!
                           (r/map (column :FRUIT/NAME)
-                                 (jdbc/plan (ds) ["select * from fruit order by id"]
+                                 (jdbc/plan (ds) [(str "select * from fruit order by " (index))]
                                             (default-options))))
                   (catch java.util.concurrent.RejectedExecutionException _
                     []))]
@@ -832,7 +856,7 @@ INSERT INTO fruit (name, appearance) VALUES (?,?)
       (let [result
             (with-open [con (jdbc/get-connection (ds))
                         stmt (jdbc/prepare con
-                                           ["select * from fruit order by id"]
+                                           [(str "select * from fruit order by " (index))]
                                            (default-options))]
               (r/foldcat
                (r/map (column :FRUIT/NAME)
@@ -846,7 +870,7 @@ INSERT INTO fruit (name, appearance) VALUES (?,?)
                         stmt (prep/statement con (default-options))]
               (r/foldcat
                (r/map (column :FRUIT/NAME)
-                      (jdbc/plan stmt ["select * from fruit order by id"]
+                      (jdbc/plan stmt [(str "select * from fruit order by " (index))]
                                  (default-options)))))]
         (is (= 1000 (count result)))
         (is (= "Fruit-1" (first result)))
@@ -854,7 +878,7 @@ INSERT INTO fruit (name, appearance) VALUES (?,?)
 
 (deftest connection-tests
   (testing "datasource via jdbcUrl"
-    (when-not (postgres?)
+    (when-not (or (postgres?) (xtdb?))
       (let [[url etc] (#'c/spec->url+etc (db))
             ds (jdbc/get-datasource (assoc etc :jdbcUrl url))]
         (cond (derby?) (is (= {:create true} etc))
@@ -937,11 +961,11 @@ INSERT INTO fruit (name, appearance) VALUES (?,?)
   (let [s (pr-str (into [] (take 3) (jdbc/plan (ds) ["select * from fruit"]
                                                (default-options))))]
     (is (or (re-find #"missing `map` or `reduce`" s)
-            (re-find #"(?i)^\[#:fruit\{.*:id.*\}\]$" s))))
-  (is (every? #(re-find #"(?i)^#:fruit\{.*:id.*\}$" %)
+            (re-find #"(?i)^\[(#:fruit)?\{.*:_?id.*\}\]$" s))))
+  (is (every? #(re-find #"(?i)^(#:fruit)?\{.*:_?id.*\}$" %)
               (into [] (map str) (jdbc/plan (ds) ["select * from fruit"]
                                             (default-options)))))
-  (is (every? #(re-find #"(?i)^#:fruit\{.*:id.*\}$" %)
+  (is (every? #(re-find #"(?i)^(#:fruit)?\{.*:_?id.*\}$" %)
               (into [] (map pr-str) (jdbc/plan (ds) ["select * from fruit"]
                                                (default-options)))))
   (is (thrown? IllegalArgumentException
