@@ -20,7 +20,7 @@
 
 (deftest test-query
   (let [ds-opts (jdbc/with-options (ds) (default-options))
-        rs      (sql/query ds-opts ["select * from fruit order by id"])]
+        rs      (sql/query ds-opts [(str "select * from fruit order by " (index))])]
     (is (= 4 (count rs)))
     (is (every? map? rs))
     (is (every? meta rs))
@@ -35,10 +35,10 @@
                   (if (or (mysql?) (sqlite?))
                     {:limit  2 :offset 1}
                     {:offset 1 :fetch  2})
-                  :columns [:ID
+                  :columns [(col-kw :ID)
                             ["CASE WHEN grade > 91 THEN 'ok ' ELSE 'bad' END"
                              :QUALITY]]
-                  :order-by [:id]))]
+                  :order-by [(col-kw :id)]))]
     (is (= 2 (count rs)))
     (is (every? map? rs))
     (is (every? meta rs))
@@ -68,10 +68,11 @@
       (is (= 1 count-v)))
     (let [count-v (sql/aggregate-by-keys ds-opts :fruit "count(*)" :all)]
       (is (= 4 count-v)))
-    (let [max-id (sql/aggregate-by-keys ds-opts :fruit "max(id)" :all)]
+    (let [max-id (sql/aggregate-by-keys ds-opts :fruit (str "max(" (index) ")") :all)]
       (is (= 4 max-id)))
-    (let [min-name (sql/aggregate-by-keys ds-opts :fruit "min(name)" :all)]
-      (is (= "Apple" min-name)))
+    (when-not (xtdb?) ; XTDB does not support min/max on strings?
+      (let [min-name (sql/aggregate-by-keys ds-opts :fruit "min(name)" :all)]
+        (is (= "Apple" min-name))))
     (is (thrown? IllegalArgumentException
                  (sql/aggregate-by-keys ds-opts :fruit "count(*)" :all {:columns []})))))
 

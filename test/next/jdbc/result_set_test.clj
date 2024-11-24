@@ -27,7 +27,9 @@
   (testing "default schema"
     (let [connectable (ds)
           test-row (rs/datafiable-row {:TABLE/FRUIT_ID 1} connectable
-                                      (default-options))
+                                      (cond-> (default-options)
+                                        (xtdb?)
+                                        (assoc :schema-opts {:pk "_id"})))
           data (d/datafy test-row)
           v (get data :TABLE/FRUIT_ID)]
       ;; check datafication is sane
@@ -40,7 +42,10 @@
     (let [connectable (ds)
           test-row (rs/datafiable-row {:foo/bar 2} connectable
                                       (assoc (default-options)
-                                             :schema {:foo/bar :fruit/id}))
+                                             :schema {:foo/bar
+                                                      (if (xtdb?)
+                                                        :fruit/_id
+                                                        :fruit/id)}))
           data (d/datafy test-row)
           v (get data :foo/bar)]
       ;; check datafication is sane
@@ -53,7 +58,10 @@
     (let [connectable (ds)
           test-row (rs/datafiable-row {:foo/bar 3} connectable
                                       (assoc (default-options)
-                                             :schema {:foo/bar [:fruit/id]}))
+                                             :schema {:foo/bar
+                                                      [(if (xtdb?)
+                                                         :fruit/_id
+                                                         :fruit/id)]}))
           data (d/datafy test-row)
           v (get data :foo/bar)]
       ;; check datafication is sane
@@ -67,7 +75,7 @@
     (let [connectable (ds)
           test-row (rs/datafiable-row {:foo/bar 2} connectable
                                       (assoc (default-options)
-                                             :schema {:foo/bar [:fruit :id]}))
+                                             :schema {:foo/bar [:fruit (col-kw :id)]}))
           data (d/datafy test-row)
           v (get data :foo/bar)]
       ;; check datafication is sane
@@ -79,7 +87,7 @@
     (let [connectable (ds)
           test-row (rs/datafiable-row {:foo/bar 3} connectable
                                       (assoc (default-options)
-                                             :schema {:foo/bar [:fruit :id :many]}))
+                                             :schema {:foo/bar [:fruit (col-kw :id) :many]}))
           data (d/datafy test-row)
           v (get data :foo/bar)]
       ;; check datafication is sane
@@ -123,17 +131,17 @@
                               (assoc (default-options)
                                      :builder-fn rs/as-lower-maps))]
       (is (map? row))
-      (is (contains? row :fruit/appearance))
-      (is (nil? (:fruit/appearance row)))
-      (is (= 3 (:fruit/id row)))
-      (is (= "Peach" (:fruit/name row)))))
+      (is (contains? row (col-kw :fruit/appearance)))
+      (is (nil? ((col-kw :fruit/appearance) row)))
+      (is (= 3 ((col-kw :fruit/id) row)))
+      (is (= "Peach" ((col-kw :fruit/name) row)))))
   (testing "unqualified lower-case row builder"
     (let [row (p/-execute-one (ds)
                               [(str "select * from fruit where " (index) " = ?") 4]
                               {:builder-fn rs/as-unqualified-lower-maps})]
       (is (map? row))
-      (is (= 4 (:id row)))
-      (is (= "Orange" (:name row)))))
+      (is (= 4 ((col-kw :id) row)))
+      (is (= "Orange" ((col-kw :name) row)))))
   (testing "kebab-case row builder"
     (let [row (p/-execute-one (ds)
                               [(str "select " (index) ",name,appearance as looks_like from fruit where " (index) " = ?") 3]
@@ -142,7 +150,8 @@
       (is (map? row))
       (is (contains? row (col-kw :fruit/looks-like)))
       (is (nil? ((col-kw :fruit/looks-like) row)))
-      (is (= 3 ((col-kw :fruit/id) row)))
+      ;; kebab-case strips leading _ from _id (XTDB):
+      (is (= 3 ((if (xtdb?) :id :fruit/id) row)))
       (is (= "Peach" ((col-kw :fruit/name) row)))))
   (testing "unqualified kebab-case row builder"
     (let [row (p/-execute-one (ds)
@@ -151,7 +160,7 @@
       (is (map? row))
       (is (contains? row :looks-like))
       (is (= "juicy" (:looks-like row)))
-      (is (= 4 ((col-kw :id) row)))
+      (is (= 4 (:id row)))
       (is (= "Orange" (:name row)))))
   (testing "custom row builder 1"
     (let [row (p/-execute-one (ds)
@@ -176,7 +185,7 @@
       (is (map? row))
       (is (contains? row :vegetable/appearance))
       (is (nil? (:vegetable/appearance row)))
-      (is (= 3 (:vegetable/id row)))
+      (is (= 3 ((if (xtdb?) :vegetable/_id :vegetable/id) row)))
       (is (= 103 (:vegetable/newid row))) ; constant qualifier here
       (is (= "Peach" (:vegetable/name row)))))
   (testing "adapted row builder"
@@ -310,15 +319,15 @@
                                #(find % :name))) ; get MapEntry works
                  (p/-execute (ds) [(str "select * from fruit where " (index) " = ?") 2]
                              {:builder-fn (constantly nil)}))))
-    (is (= [{:id 3 :name "Peach"}]
-           (into [] (map #(select-keys % [:id :name])) ; select-keys works
+    (is (= [{(col-kw :id) 3 :name "Peach"}]
+           (into [] (map #(select-keys % [(col-kw :id) :name])) ; select-keys works
                  (p/-execute (ds) [(str "select * from fruit where " (index) " = ?") 3]
                              {:builder-fn (constantly nil)}))))
     (is (= [[:orange 4]]
            (into [] (map #(vector (if (contains? % :name) ; contains works
                                     (keyword (str/lower-case (:name %)))
                                     :unnamed)
-                                  (get % :id 0))) ; get with not-found works
+                                  (get % (col-kw :id) 0))) ; get with not-found works
                  (p/-execute (ds) [(str "select * from fruit where " (index) " = ?") 4]
                              {:builder-fn (constantly nil)}))))
     (is (= [{}]
@@ -434,7 +443,7 @@
     (valAt [this k] (get this k nil))
     (valAt [this k not-found]
       (case k
-        :cols [:id :name :appearance :cost :grade]
+        :cols [(col-kw :id) :name :appearance :cost :grade]
         :rsmeta rsmeta
         not-found))))
 
@@ -497,10 +506,10 @@ CREATE TABLE CLOBBER (
   (testing "get n on bare abstraction over arrays"
     (is (= [1 2 3]
            (into [] (map #(get % 0))
-                 (p/-execute (ds) [(str "select " (index) " from fruit where " (index) " < ?") 4]
+                 (p/-execute (ds) [(str "select " (index) " from fruit where " (index) " < ? order by " (index)) 4]
                              {:builder-fn rs/as-arrays})))))
   (testing "nth on bare abstraction over arrays"
     (is (= [1 2 3]
            (into [] (map #(nth % 0))
-                 (p/-execute (ds) [(str "select " (index) " from fruit where " (index) " < ?") 4]
+                 (p/-execute (ds) [(str "select " (index) " from fruit where " (index) " < ? order by " (index)) 4]
                              {:builder-fn rs/as-arrays}))))))

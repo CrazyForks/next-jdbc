@@ -117,7 +117,7 @@
 (defn col-kw [k]
   (if (xtdb?)
     (let [n (name k)]
-      (if (= "id" n) :_id (keyword n)))
+      (if (= "id" (str/lower-case n)) :_id (keyword n)))
     k))
 
 (defn default-options []

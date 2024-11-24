@@ -163,25 +163,26 @@
         (is (every? int? (map first (rest rs))))
         (let [n (max (.indexOf ^java.util.List (first rs) :name) 1)]
           (is (every? string? (map #(nth % n) (rest rs)))))))
-    (testing "execute! with :max-rows / :maxRows"
-      (let [rs (jdbc/execute!
-                ds-opts
-                [(str "select * from fruit order by " (index))]
-                {:max-rows 2})]
-        (is (every? map? rs))
-        (is (every? meta rs))
-        (is (= 2 (count rs)))
-        (is (= 1 ((column :FRUIT/ID) (first rs))))
-        (is (= 2 ((column :FRUIT/ID) (last rs)))))
-      (let [rs (jdbc/execute!
-                ds-opts
-                [(str "select * from fruit order by " (index))]
-                {:statement {:maxRows 2}})]
-        (is (every? map? rs))
-        (is (every? meta rs))
-        (is (= 2 (count rs)))
-        (is (= 1 ((column :FRUIT/ID) (first rs))))
-        (is (= 2 ((column :FRUIT/ID) (last rs)))))))
+    (when-not (xtdb?) ; XTDB does not support this yet
+      (testing "execute! with :max-rows / :maxRows"
+        (let [rs (jdbc/execute!
+                  ds-opts
+                  [(str "select * from fruit order by " (index))]
+                  {:max-rows 2})]
+          (is (every? map? rs))
+          (is (every? meta rs))
+          (is (= 2 (count rs)))
+          (is (= 1 ((column :FRUIT/ID) (first rs))))
+          (is (= 2 ((column :FRUIT/ID) (last rs)))))
+        (let [rs (jdbc/execute!
+                  ds-opts
+                  [(str "select * from fruit order by " (index))]
+                  {:statement {:maxRows 2}})]
+          (is (every? map? rs))
+          (is (every? meta rs))
+          (is (= 2 (count rs)))
+          (is (= 1 ((column :FRUIT/ID) (first rs))))
+          (is (= 2 ((column :FRUIT/ID) (last rs))))))))
   (testing "prepare"
     ;; default options do not flow over get-connection
     (let [rs (with-open [con (jdbc/get-connection (ds))
@@ -211,7 +212,6 @@
     (let [rs (with-open [con (jdbc/get-connection (ds))]
                (jdbc/execute! (prep/statement con (default-options))
                               [(str "select * from fruit order by " (index))]))]
-      (when (xtdb?) (println rs))
       (is (every? map? rs))
       (is (every? meta rs))
       (is (= 4 (count rs)))
@@ -221,7 +221,6 @@
     (let [rs (with-open [con (jdbc/get-connection (ds))]
                (jdbc/execute! (prep/statement con (default-options))
                               [(str "select * from fruit where " (index) " = 4")]))]
-      (when (xtdb?) (println rs))
       (is (every? map? rs))
       (is (every? meta rs))
       (is (= 1 (count rs)))
