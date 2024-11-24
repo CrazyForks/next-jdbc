@@ -2,15 +2,14 @@
 
 (ns next.jdbc.datafy-test
   "Tests for the datafy extensions over JDBC types."
-  (:require
-   [clojure.datafy :as d]
-   [clojure.set :as set]
-   [clojure.test :refer [deftest is testing use-fixtures]]
-   [next.jdbc :as jdbc]
-   [next.jdbc.datafy]
-   [next.jdbc.result-set :as rs]
-   [next.jdbc.specs :as specs]
-   [next.jdbc.test-fixtures
+  (:require [clojure.datafy :as d]
+            [clojure.set :as set]
+            [clojure.test :refer [deftest is testing use-fixtures]]
+            [next.jdbc :as jdbc]
+            [next.jdbc.datafy]
+            [next.jdbc.result-set :as rs]
+            [next.jdbc.specs :as specs]
+            [next.jdbc.test-fixtures
              :refer [db derby? ds jtds? mysql? postgres? sqlite? with-test-db
                      xtdb?]]))
 
@@ -145,24 +144,4 @@
   (.getResultSet ps)
   (.close ps)
   (.close con)
-  #{
-    }
-  (= #{:driverMinorVersion :numericFunctions :catalogTerm :maxStatements :maxIndexLength :maxColumnsInOrderBy
-       :maxBinaryLiteralLength :driverName :procedureTerm :all-tables :SQLStateType :maxCharLiteralLength :JDBCMajorVersion
-       :catalogs :maxColumnsInTable :timeDateFunctions
-       :maxConnections
-       :systemFunctions :databaseMajorVersion :databaseProductVersion :JDBCMinorVersion :schemas :readOnly :driverVersion :class :maxTablesInSelect :maxColumnsInGroupBy
-       :identifierQuoteString :maxColumnsInIndex :driverMajorVersion :typeInfo :tableTypes
-       :maxRowSize :stringFunctions :resultSetHoldability
-       :SQLKeywords :searchStringEscape :URL :databaseProductName :catalogSeparator
-       :connection :catalogAtStart :maxStatementLength :extraNameCharacters :userName :databaseMinorVersion :maxColumnsInSelect :schemaTerm
-}
-     #{:driverMinorVersion :numericFunctions :catalogTerm :maxStatements :maxIndexLength :maxColumnsInOrderBy
-       :maxBinaryLiteralLength :driverName :procedureTerm :all-tables :SQLStateType :maxCharLiteralLength :JDBCMajorVersion
-       :catalogs :maxColumnsInTable :timeDateFunctions
-       :maxConnections
-       :systemFunctions :databaseMajorVersion :databaseProductVersion :JDBCMinorVersion :schemas :readOnly :driverVersion :class :maxTablesInSelect :maxColumnsInGroupBy
-       :identifierQuoteString :maxColumnsInIndex :driverMajorVersion :typeInfo :tableTypes
-       :maxRowSize :stringFunctions :resultSetHoldability
-       :SQLKeywords :searchStringEscape :URL :databaseProductName :catalogSeparator
-       :connection :catalogAtStart :maxStatementLength :extraNameCharacters :userName :databaseMinorVersion :maxColumnsInSelect :schemaTerm}))
+  )

@@ -2,15 +2,14 @@
 
 (ns next.jdbc.sql-test
   "Tests for the syntactic sugar SQL functions."
-  (:require
-   [clojure.test :refer [deftest is testing use-fixtures]]
-   [next.jdbc :as jdbc]
-   [next.jdbc.specs :as specs]
-   [next.jdbc.sql :as sql]
-   [next.jdbc.test-fixtures
+  (:require [clojure.test :refer [deftest is testing use-fixtures]]
+            [next.jdbc :as jdbc]
+            [next.jdbc.specs :as specs]
+            [next.jdbc.sql :as sql]
+            [next.jdbc.test-fixtures
              :refer [column col-kw default-options derby? ds index
                      jtds? maria? mssql? mysql? postgres? sqlite? with-test-db xtdb?]]
-   [next.jdbc.types :refer [as-other as-real as-varchar]]))
+            [next.jdbc.types :refer [as-other as-real as-varchar]]))
 
 (set! *warn-on-reflection* true)
 
