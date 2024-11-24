@@ -2,16 +2,17 @@
 
 (ns next.jdbc.datafy-test
   "Tests for the datafy extensions over JDBC types."
-  (:require [clojure.datafy :as d]
-            [clojure.set :as set]
-            [clojure.test :refer [deftest is testing use-fixtures]]
-            [next.jdbc :as jdbc]
-            [next.jdbc.datafy]
-            [next.jdbc.result-set :as rs]
-            [next.jdbc.specs :as specs]
-            [next.jdbc.test-fixtures
-             :refer [with-test-db db ds
-                      derby? jtds? mysql? postgres? sqlite?]]))
+  (:require
+   [clojure.datafy :as d]
+   [clojure.set :as set]
+   [clojure.test :refer [deftest is testing use-fixtures]]
+   [next.jdbc :as jdbc]
+   [next.jdbc.datafy]
+   [next.jdbc.result-set :as rs]
+   [next.jdbc.specs :as specs]
+   [next.jdbc.test-fixtures
+             :refer [db derby? ds jtds? mysql? postgres? sqlite? with-test-db
+                     xtdb?]]))
 
 (set! *warn-on-reflection* true)
 
@@ -83,6 +84,26 @@
                                                    :rowIdLifetime/exception))
                              (postgres?) (-> (disj :rowIdLifetime)
                                              (conj :rowIdLifetime/exception))
+                             (xtdb?)     (-> (disj :clientInfoProperties
+                                                   :defaultTransactionIsolation
+                                                   :maxCatalogNameLength
+                                                   :maxColumnNameLength
+                                                   :maxCursorNameLength
+                                                   :maxProcedureNameLength
+                                                   :maxSchemaNameLength
+                                                   :maxTableNameLength
+                                                   :maxUserNameLength
+                                                   :rowIdLifetime)
+                                             (conj :clientInfoProperties/exception
+                                                   :defaultTransactionIsolation/exception
+                                                   :maxCatalogNameLength/exception
+                                                   :maxColumnNameLength/exception
+                                                   :maxCursorNameLength/exception
+                                                   :maxProcedureNameLength/exception
+                                                   :maxSchemaNameLength/exception
+                                                   :maxTableNameLength/exception
+                                                   :maxUserNameLength/exception
+                                                   :rowIdLifetime/exception))
                              (sqlite?)   (-> (disj :clientInfoProperties :rowIdLifetime)
                                              (conj :clientInfoProperties/exception
                                                    :rowIdLifetime/exception)))
@@ -97,7 +118,8 @@
       (let [data (d/datafy (.getMetaData con))]
         (doseq [k (cond-> #{:catalogs :clientInfoProperties :schemas :tableTypes :typeInfo}
                     (jtds?)   (disj :clientInfoProperties)
-                    (sqlite?) (disj :clientInfoProperties))]
+                    (sqlite?) (disj :clientInfoProperties)
+                    (xtdb?)   (disj :clientInfoProperties))]
           (let [rs (d/nav data k nil)]
             (is (vector? rs))
             (is (every? map? rs))))))))
@@ -122,4 +144,25 @@
   (.execute ps)
   (.getResultSet ps)
   (.close ps)
-  (.close con))
+  (.close con)
+  #{
+    }
+  (= #{:driverMinorVersion :numericFunctions :catalogTerm :maxStatements :maxIndexLength :maxColumnsInOrderBy
+       :maxBinaryLiteralLength :driverName :procedureTerm :all-tables :SQLStateType :maxCharLiteralLength :JDBCMajorVersion
+       :catalogs :maxColumnsInTable :timeDateFunctions
+       :maxConnections
+       :systemFunctions :databaseMajorVersion :databaseProductVersion :JDBCMinorVersion :schemas :readOnly :driverVersion :class :maxTablesInSelect :maxColumnsInGroupBy
+       :identifierQuoteString :maxColumnsInIndex :driverMajorVersion :typeInfo :tableTypes
+       :maxRowSize :stringFunctions :resultSetHoldability
+       :SQLKeywords :searchStringEscape :URL :databaseProductName :catalogSeparator
+       :connection :catalogAtStart :maxStatementLength :extraNameCharacters :userName :databaseMinorVersion :maxColumnsInSelect :schemaTerm
+}
+     #{:driverMinorVersion :numericFunctions :catalogTerm :maxStatements :maxIndexLength :maxColumnsInOrderBy
+       :maxBinaryLiteralLength :driverName :procedureTerm :all-tables :SQLStateType :maxCharLiteralLength :JDBCMajorVersion
+       :catalogs :maxColumnsInTable :timeDateFunctions
+       :maxConnections
+       :systemFunctions :databaseMajorVersion :databaseProductVersion :JDBCMinorVersion :schemas :readOnly :driverVersion :class :maxTablesInSelect :maxColumnsInGroupBy
+       :identifierQuoteString :maxColumnsInIndex :driverMajorVersion :typeInfo :tableTypes
+       :maxRowSize :stringFunctions :resultSetHoldability
+       :SQLKeywords :searchStringEscape :URL :databaseProductName :catalogSeparator
+       :connection :catalogAtStart :maxStatementLength :extraNameCharacters :userName :databaseMinorVersion :maxColumnsInSelect :schemaTerm}))

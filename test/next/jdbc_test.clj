@@ -120,8 +120,9 @@
         (when (xtdb?) (println (first rs)
                                (.indexOf ^java.util.List (first rs) :name)
                                (.indexOf (first rs) :name)))
-        (let [n (.indexOf ^java.util.List (first rs) :name)]
-          (is (every? string? (map #(nth % n) (rest rs)))))))
+        (let [n (or (.indexOf ^java.util.List (first rs) :name) 1)]
+          (is (try (every? string? (map #(nth % n) (rest rs)))
+                   (catch Throwable _ (println (rest rs))))))))
     (testing "execute! with adapter"
       (let [rs (jdbc/execute! ; test again, with adapter and lower columns
                 ds-opts
@@ -142,8 +143,9 @@
         (when (xtdb?) (println (first rs)
                                (.indexOf ^java.util.List (first rs) :name)
                                (.indexOf (first rs) :name)))
-        (let [n (.indexOf ^java.util.List (first rs) :name)]
-          (is (every? string? (map #(nth % n) (rest rs)))))))
+        (let [n (or (.indexOf ^java.util.List (first rs) :name) 1)]
+          (is (try (every? string? (map #(nth % n) (rest rs)))
+                   (catch Throwable _ (println (rest rs))))))))
     (testing "execute! with unqualified"
       (let [rs (jdbc/execute!
                 (ds)
@@ -170,8 +172,9 @@
         (when (xtdb?) (println (first rs)
                                (.indexOf ^java.util.List (first rs) :name)
                                (.indexOf (first rs) :name)))
-        (let [n (.indexOf ^java.util.List (first rs) :name)]
-          (is (every? string? (map #(nth % n) (rest rs)))))))
+        (let [n (or (.indexOf ^java.util.List (first rs) :name) 1)]
+          (is (try (every? string? (map #(nth % n) (rest rs)))
+                   (catch Throwable _ (println (rest rs))))))))
     (testing "execute! with :max-rows / :maxRows"
       (let [rs (jdbc/execute!
                 ds-opts

@@ -114,7 +114,10 @@
                       (mssql?)    :GENERATED_KEYS
                       (mysql?)    :GENERATED_KEY
                       (postgres?) :fruit/id
-                      (xtdb?)     :_id
+                      ;; XTDB does not return the generated key so we fix it
+                      ;; to be the one we insert here, and then fake it in all
+                      ;; the other tests.
+                      (xtdb?)     (constantly 5)
                       :else       :FRUIT/ID)]
     (testing "single insert/delete"
       (is (== 5 (new-key (doto
@@ -139,6 +142,8 @@
                    [8M]
                    (maria?)
                    [6]
+                   (xtdb?)
+                   []
                    :else
                    [6 7 8])
              (mapv new-key
@@ -167,6 +172,8 @@
                    [11M]
                    (maria?)
                    [9]
+                   (xtdb?)
+                   []
                    :else
                    [9 10 11])
              (mapv new-key
@@ -195,6 +202,8 @@
                    [14M]
                    (maria?)
                    [12]
+                   (xtdb?)
+                   []
                    :else
                    [12 13 14])
              (mapv new-key
