@@ -168,7 +168,7 @@
       (is (= "Peach" ((column :FRUIT/name) row)))))
   (testing "custom row builder 2"
     (let [row (p/-execute-one (ds)
-                              ["select fruit.*, id + 100 as newid from fruit where id = ?" 3]
+                              [(str "select fruit.*, " (index) " + 100 as newid from fruit where " (index) " = ?") 3]
                               (assoc (default-options)
                                      :builder-fn rs/as-modified-maps
                                      :label-fn str/lower-case
@@ -236,7 +236,7 @@
   (testing "row-numbers on bare abstraction"
     (is (= [1 2 3]
            (into [] (map rs/row-number)
-                 (p/-execute (ds) ["select * from fruit where id < ?" 4]
+                 (p/-execute (ds) [(str "select * from fruit where " (index) " < ?") 4]
                              ;; we do not need a real builder here...
                              (cond-> {:builder-fn (constantly nil)}
                                      (derby?)
@@ -247,7 +247,7 @@
     (is (= [1 2 3]
            (into [] (comp (map #(rs/datafiable-row % (ds) {}))
                           (map rs/row-number))
-                 (p/-execute (ds) ["select * from fruit where id < ?" 4]
+                 (p/-execute (ds) [(str "select * from fruit where " (index) " < ?") 4]
                              ;; ...but datafiable-row requires a real builder
                              (cond-> {:builder-fn rs/as-arrays}
                                      (derby?)
@@ -257,7 +257,7 @@
 
 (deftest test-column-names
   (testing "column-names on bare abstraction"
-    (is (= #{"id" "appearance" "grade" "cost" "name"}
+    (is (= #{(index) "appearance" "grade" "cost" "name"}
            (reduce (fn [_ row]
                      (-> row
                          (->> (rs/column-names)
@@ -265,11 +265,11 @@
                               (set)
                               (reduced))))
                    nil
-                   (p/-execute (ds) ["select * from fruit where id < ?" 4]
+                   (p/-execute (ds) [(str "select * from fruit where " (index) " < ?") 4]
                                ;; column-names require a real builder
                                {:builder-fn rs/as-arrays})))))
   (testing "column-names on realized row"
-    (is (= #{"id" "appearance" "grade" "cost" "name"}
+    (is (= #{(index) "appearance" "grade" "cost" "name"}
            (reduce (fn [_ row]
                      (-> row
                          (rs/datafiable-row (ds) {})
@@ -278,7 +278,7 @@
                               (set)
                               (reduced))))
                    nil
-                   (p/-execute (ds) ["select * from fruit where id < ?" 4]
+                   (p/-execute (ds) [(str "select * from fruit where " (index) " < ?") 4]
                                {:builder-fn rs/as-arrays}))))))
 
 (deftest test-over-partition-all
@@ -306,7 +306,7 @@
                  (p/-execute (ds) [(str "select * from fruit where " (index) " = ?") 1]
                              {:builder-fn (constantly nil)}))))
     (is (= [[2 [:name "Banana"]]]
-           (into [] (map (juxt #(get % "id") ; get by string key works
+           (into [] (map (juxt #(get % (index)) ; get by string key works
                                #(find % :name))) ; get MapEntry works
                  (p/-execute (ds) [(str "select * from fruit where " (index) " = ?") 2]
                              {:builder-fn (constantly nil)}))))
@@ -417,7 +417,7 @@
 (defn fruit-builder [^ResultSet rs ^ResultSetMetaData rsmeta]
   (reify
     rs/RowBuilder
-    (->row [_] (->Fruit (.getObject rs "id")
+    (->row [_] (->Fruit (.getObject rs ^String (index))
                         (.getObject rs "name")
                         (.getObject rs "appearance")
                         (.getObject rs "cost")
@@ -497,10 +497,10 @@ CREATE TABLE CLOBBER (
   (testing "get n on bare abstraction over arrays"
     (is (= [1 2 3]
            (into [] (map #(get % 0))
-                 (p/-execute (ds) ["select id from fruit where id < ?" 4]
+                 (p/-execute (ds) [(str "select " (index) " from fruit where " (index) " < ?") 4]
                              {:builder-fn rs/as-arrays})))))
   (testing "nth on bare abstraction over arrays"
     (is (= [1 2 3]
            (into [] (map #(nth % 0))
-                 (p/-execute (ds) ["select id from fruit where id < ?" 4]
+                 (p/-execute (ds) [(str "select " (index) " from fruit where " (index) " < ?") 4]
                              {:builder-fn rs/as-arrays}))))))

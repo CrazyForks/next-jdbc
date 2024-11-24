@@ -89,17 +89,22 @@
       (is (map? row))
       (is (= 2 ((column :FRUIT/ID) row))))))
 
+(defn- update-count [n]
+  (if (xtdb?)
+    {:next.jdbc/update-count 0}
+    {:next.jdbc/update-count n}))
+
 (deftest test-update!
   (let [ds-opts (jdbc/with-options (ds) (default-options))]
     (try
-      (is (= {:next.jdbc/update-count 1}
+      (is (= (update-count 1)
              (sql/update! ds-opts :fruit {:appearance "brown"} {(col-kw :id) 2})))
       (is (= "brown" ((column :FRUIT/APPEARANCE)
                       (sql/get-by-id ds-opts :fruit 2 (col-kw :id) {}))))
       (finally
         (sql/update! ds-opts :fruit {:appearance "yellow"} {(col-kw :id) 2})))
     (try
-      (is (= {:next.jdbc/update-count 1}
+      (is (= (update-count 1)
              (sql/update! ds-opts :fruit {:appearance "green"}
                           ["name = ?" "Banana"])))
       (is (= "green" ((column :FRUIT/APPEARANCE)
@@ -120,19 +125,17 @@
                       (xtdb?)     (constantly 5)
                       :else       :FRUIT/ID)]
     (testing "single insert/delete"
-      (is (== 5 (new-key (doto
-                          (sql/insert! (ds) :fruit
-                                       (cond-> {:name (as-varchar "Kiwi")
-                                                :appearance "green & fuzzy"
-                                                :cost 100 :grade (as-real 99.9)}
-                                         (xtdb?)
-                                         (assoc :_id 5))
-                                       {:suffix
-                                        (when (sqlite?)
-                                          "RETURNING *")})
-                           (println (ds))))))
+      (is (== 5 (new-key (sql/insert! (ds) :fruit
+                                      (cond-> {:name (as-varchar "Kiwi")
+                                               :appearance "green & fuzzy"
+                                               :cost 100 :grade (as-real 99.9)}
+                                        (xtdb?)
+                                        (assoc :_id 5))
+                                      {:suffix
+                                       (when (sqlite?)
+                                         "RETURNING *")}))))
       (is (= 5 (count (sql/query (ds) ["select * from fruit"]))))
-      (is (= {:next.jdbc/update-count 1}
+      (is (= (update-count 1)
              (sql/delete! (ds) :fruit {(col-kw :id) 5})))
       (is (= 4 (count (sql/query (ds) ["select * from fruit"])))))
     (testing "multiple insert/delete"
@@ -159,10 +162,10 @@
                                        (when (sqlite?)
                                          "RETURNING *")}))))
       (is (= 7 (count (sql/query (ds) ["select * from fruit"]))))
-      (is (= {:next.jdbc/update-count 1}
+      (is (= (update-count 1)
              (sql/delete! (ds) :fruit {(col-kw :id) 6})))
       (is (= 6 (count (sql/query (ds) ["select * from fruit"]))))
-      (is (= {:next.jdbc/update-count 2}
+      (is (= (update-count 2)
              (sql/delete! (ds) :fruit [(str (index) " > ?") 4])))
       (is (= 4 (count (sql/query (ds) ["select * from fruit"])))))
     (testing "multiple insert/delete with sequential cols/rows" ; per #43
@@ -189,10 +192,10 @@
                                        (when (sqlite?)
                                          "RETURNING *")}))))
       (is (= 7 (count (sql/query (ds) ["select * from fruit"]))))
-      (is (= {:next.jdbc/update-count 1}
+      (is (= (update-count 1)
              (sql/delete! (ds) :fruit {(col-kw :id) 9})))
       (is (= 6 (count (sql/query (ds) ["select * from fruit"]))))
-      (is (= {:next.jdbc/update-count 2}
+      (is (= (update-count 2)
              (sql/delete! (ds) :fruit [(str (index) " > ?") 4])))
       (is (= 4 (count (sql/query (ds) ["select * from fruit"])))))
     (testing "multiple insert/delete with maps"
@@ -226,10 +229,10 @@
                                        (when (sqlite?)
                                          "RETURNING *")}))))
       (is (= 7 (count (sql/query (ds) ["select * from fruit"]))))
-      (is (= {:next.jdbc/update-count 1}
+      (is (= (update-count 1)
              (sql/delete! (ds) :fruit {(col-kw :id) 12})))
       (is (= 6 (count (sql/query (ds) ["select * from fruit"]))))
-      (is (= {:next.jdbc/update-count 2}
+      (is (= (update-count 2)
              (sql/delete! (ds) :fruit [(str (index) " > ?") 10])))
       (is (= 4 (count (sql/query (ds) ["select * from fruit"])))))
     (testing "empty insert-multi!" ; per #44 and #264

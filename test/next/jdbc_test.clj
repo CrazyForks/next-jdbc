@@ -117,12 +117,8 @@
         (is (= (column :FRUIT/ID) (ffirst rs)))
         ;; and all its corresponding values should be ints
         (is (every? int? (map first (rest rs))))
-        (when (xtdb?) (println (first rs)
-                               (.indexOf ^java.util.List (first rs) :name)
-                               (.indexOf (first rs) :name)))
-        (let [n (or (.indexOf ^java.util.List (first rs) :name) 1)]
-          (is (try (every? string? (map #(nth % n) (rest rs)))
-                   (catch Throwable _ (println (rest rs))))))))
+        (let [n (max (.indexOf ^java.util.List (first rs) :name) 1)]
+          (is (every? string? (map #(nth % n) (rest rs)))))))
     (testing "execute! with adapter"
       (let [rs (jdbc/execute! ; test again, with adapter and lower columns
                 ds-opts
@@ -140,12 +136,8 @@
         (is (= (col-kw :fruit/id) (ffirst rs)))
         ;; and all its corresponding values should be ints
         (is (every? int? (map first (rest rs))))
-        (when (xtdb?) (println (first rs)
-                               (.indexOf ^java.util.List (first rs) :name)
-                               (.indexOf (first rs) :name)))
-        (let [n (or (.indexOf ^java.util.List (first rs) :name) 1)]
-          (is (try (every? string? (map #(nth % n) (rest rs)))
-                   (catch Throwable _ (println (rest rs))))))))
+        (let [n (max (.indexOf ^java.util.List (first rs) :name) 1)]
+          (is (every? string? (map #(nth % n) (rest rs)))))))
     (testing "execute! with unqualified"
       (let [rs (jdbc/execute!
                 (ds)
@@ -169,12 +161,8 @@
         (is (= (column :ID) (ffirst rs)))
         ;; and all its corresponding values should be ints
         (is (every? int? (map first (rest rs))))
-        (when (xtdb?) (println (first rs)
-                               (.indexOf ^java.util.List (first rs) :name)
-                               (.indexOf (first rs) :name)))
-        (let [n (or (.indexOf ^java.util.List (first rs) :name) 1)]
-          (is (try (every? string? (map #(nth % n) (rest rs)))
-                   (catch Throwable _ (println (rest rs))))))))
+        (let [n (max (.indexOf ^java.util.List (first rs) :name) 1)]
+          (is (every? string? (map #(nth % n) (rest rs)))))))
     (testing "execute! with :max-rows / :maxRows"
       (let [rs (jdbc/execute!
                 ds-opts
