@@ -13,20 +13,12 @@
     (is (= (builder/by-keys {:a nil :b 42 :c "s"} :where {})
            ["WHERE a IS NULL AND b = ? AND c = ?" 42 "s"]))
     (is (= (builder/by-keys {:q/a nil :q/b 42 :q/c "s"} :where {})
-           ["WHERE a IS NULL AND b = ? AND c = ?" 42 "s"]))
-    (is (= (builder/by-keys {:q/a nil :q/b 42 :q/c "s"} :where
-                            {:name-fn builder/qualified-name
-                             :column-fn mysql})
-           ["WHERE `q/a` IS NULL AND `q/b` = ? AND `q/c` = ?" 42 "s"])))
+           ["WHERE a IS NULL AND b = ? AND c = ?" 42 "s"])))
   (testing ":set clause"
     (is (= (builder/by-keys {:a nil :b 42 :c "s"} :set {})
            ["SET a = ?, b = ?, c = ?" nil 42 "s"]))
     (is (= (builder/by-keys {:q/a nil :q/b 42 :q/c "s"} :set {})
-           ["SET a = ?, b = ?, c = ?" nil 42 "s"]))
-    (is (= (builder/by-keys {:q/a nil :q/b 42 :q/c "s"} :set
-                            {:name-fn builder/qualified-name
-                             :column-fn mysql})
-           ["SET `q/a` = ?, `q/b` = ?, `q/c` = ?" nil 42 "s"]))))
+           ["SET a = ?, b = ?, c = ?" nil 42 "s"]))))
 
 (deftest test-as-cols
   (is (= (builder/as-cols [:a :b :c] {})
@@ -40,34 +32,18 @@
   (is (= (builder/as-cols [[:q/a :q/aa] :q/b ["count(*)" :q/c]] {})
          "a AS aa, b, count(*) AS c"))
   (is (= (builder/as-cols [[:q/a :q/aa] :q/b ["count(*)" :q/c]] {:column-fn mysql})
-         "`a` AS `aa`, `b`, count(*) AS `c`"))
-  (is (= (builder/as-cols [:q/a :q/b :q/c]
-                          {:name-fn builder/qualified-name
-                           :column-fn mysql})
-         "`q/a`, `q/b`, `q/c`"))
-  (is (= (builder/as-cols [[:q/a :q/aa] :q/b ["count(*)" :q/c]]
-                          {:name-fn builder/qualified-name
-                           :column-fn mysql})
-         "`q/a` AS `q/aa`, `q/b`, count(*) AS `q/c`")))
+         "`a` AS `aa`, `b`, count(*) AS `c`")))
 
 (deftest test-as-keys
   (is (= (builder/as-keys {:a nil :b 42 :c "s"} {})
          "a, b, c"))
   (is (= (builder/as-keys {:q/a nil :q/b 42 :q/c "s"} {})
-         "a, b, c"))
-  (is (= (builder/as-keys {:q/a nil :q/b 42 :q/c "s"}
-                          {:name-fn builder/qualified-name
-                           :column-fn sql-server})
-         "[q/a], [q/b], [q/c]")))
+         "a, b, c")))
 
 (deftest test-as-?
   (is (= (builder/as-? {:a nil :b 42 :c "s"} {})
          "?, ?, ?"))
   (is (= (builder/as-? {:q/a nil :q/b 42 :q/c "s"} {})
-         "?, ?, ?"))
-  (is (= (builder/as-? {:q/a nil :q/b 42 :q/c "s"}
-                       {:name-fn builder/qualified-name
-                        :column-fn sql-server})
          "?, ?, ?")))
 
 (deftest test-for-query
@@ -95,23 +71,7 @@
                               {:q/id nil}
                               {:table-fn sql-server :column-fn mysql
                                :suffix "FOR UPDATE"})
-           ["SELECT * FROM [user] WHERE `id` IS NULL FOR UPDATE"]))
-    (is (= (builder/for-query
-            :t/user
-            {:q/id 9}
-            {:table-fn sql-server :column-fn mysql :order-by [:x/a [:x/b :desc]]
-             :name-fn builder/qualified-name})
-           ["SELECT * FROM [t/user] WHERE `q/id` = ? ORDER BY `x/a`, `x/b` DESC" 9]))
-    (is (= (builder/for-query :t/user {:q/id nil}
-                              {:table-fn sql-server :column-fn mysql
-                               :name-fn builder/qualified-name})
-           ["SELECT * FROM [t/user] WHERE `q/id` IS NULL"]))
-    (is (= (builder/for-query :t/user
-                              {:q/id nil}
-                              {:table-fn sql-server :column-fn mysql
-                               :name-fn builder/qualified-name
-                               :suffix "FOR UPDATE"})
-           ["SELECT * FROM [t/user] WHERE `q/id` IS NULL FOR UPDATE"])))
+           ["SELECT * FROM [user] WHERE `id` IS NULL FOR UPDATE"])))
   (testing "by where clause"
     (is (= (builder/for-query
             :user
@@ -183,13 +143,7 @@
             :t/user
             {:q/opt nil :q/id 9}
             {:table-fn sql-server :column-fn mysql})
-           ["DELETE FROM [user] WHERE `opt` IS NULL AND `id` = ?" 9]))
-    (is (= (builder/for-delete
-            :t/user
-            {:q/opt nil :q/id 9}
-            {:table-fn sql-server :column-fn mysql
-             :name-fn builder/qualified-name})
-           ["DELETE FROM [t/user] WHERE `q/opt` IS NULL AND `q/id` = ?" 9])))
+           ["DELETE FROM [user] WHERE `opt` IS NULL AND `id` = ?" 9])))
   (testing "by where clause"
     (is (= (builder/for-delete
             :user
@@ -200,13 +154,7 @@
             :t/user
             ["id = ? and opt is null" 9]
             {:table-fn sql-server :column-fn mysql})
-           ["DELETE FROM [user] WHERE id = ? and opt is null" 9]))
-    (is (= (builder/for-delete
-            :t/user
-            ["id = ? and opt is null" 9]
-            {:table-fn sql-server :column-fn mysql
-             :name-fn builder/qualified-name})
-           ["DELETE FROM [t/user] WHERE id = ? and opt is null" 9]))))
+           ["DELETE FROM [user] WHERE id = ? and opt is null" 9]))))
 
 (deftest test-for-update
   (testing "empty example (would be a SQL error)"
@@ -225,13 +173,7 @@
                                {:q/status 42}
                                {:q/id 9}
                                {:table-fn sql-server :column-fn mysql})
-           ["UPDATE [user] SET `status` = ? WHERE `id` = ?" 42 9]))
-    (is (= (builder/for-update :t/user
-                               {:q/status 42}
-                               {:q/id 9}
-                               {:table-fn sql-server :column-fn mysql
-                                :name-fn builder/qualified-name})
-           ["UPDATE [t/user] SET `q/status` = ? WHERE `q/id` = ?" 42 9])))
+           ["UPDATE [user] SET `status` = ? WHERE `id` = ?" 42 9])))
   (testing "by where clause, with nil set value"
     (is (= (builder/for-update :user
                                {:status 42, :opt nil}
@@ -248,12 +190,7 @@
     (is (= (builder/for-insert :t/user
                                {:q/id 9 :q/status 42 :q/opt nil}
                                {:table-fn sql-server :column-fn mysql})
-           ["INSERT INTO [user] (`id`, `status`, `opt`) VALUES (?, ?, ?)" 9 42 nil]))
-    (is (= (builder/for-insert :t/user
-                               {:q/id 9 :q/status 42 :q/opt nil}
-                               {:table-fn sql-server :column-fn mysql
-                                :name-fn builder/qualified-name})
-           ["INSERT INTO [t/user] (`q/id`, `q/status`, `q/opt`) VALUES (?, ?, ?)" 9 42 nil])))
+           ["INSERT INTO [user] (`id`, `status`, `opt`) VALUES (?, ?, ?)" 9 42 nil])))
   (testing "multi-row insert (normal mode)"
     (is (= (builder/for-insert-multi :user
                                      [:id :status]
@@ -268,15 +205,7 @@
                                       [35 "world"]
                                       [64 "dollars"]]
                                      {:table-fn sql-server :column-fn mysql})
-           ["INSERT INTO [user] (`id`, `status`) VALUES (?, ?), (?, ?), (?, ?)" 42 "hello" 35 "world" 64 "dollars"]))
-    (is (= (builder/for-insert-multi :t/user
-                                     [:q/id :q/status]
-                                     [[42 "hello"]
-                                      [35 "world"]
-                                      [64 "dollars"]]
-                                     {:table-fn sql-server :column-fn mysql
-                                      :name-fn builder/qualified-name})
-           ["INSERT INTO [t/user] (`q/id`, `q/status`) VALUES (?, ?), (?, ?), (?, ?)" 42 "hello" 35 "world" 64 "dollars"])))
+           ["INSERT INTO [user] (`id`, `status`) VALUES (?, ?), (?, ?), (?, ?)" 42 "hello" 35 "world" 64 "dollars"])))
   (testing "multi-row insert (batch mode)"
     (is (= (builder/for-insert-multi :user
                                      [:id :status]
@@ -291,12 +220,4 @@
                                       [35 "world"]
                                       [64 "dollars"]]
                                      {:table-fn sql-server :column-fn mysql :batch true})
-           ["INSERT INTO [user] (`id`, `status`) VALUES (?, ?)" [42 "hello"] [35 "world"] [64 "dollars"]]))
-    (is (= (builder/for-insert-multi :t/user
-                                     [:q/id :q/status]
-                                     [[42 "hello"]
-                                      [35 "world"]
-                                      [64 "dollars"]]
-                                     {:table-fn sql-server :column-fn mysql :batch true
-                                      :name-fn builder/qualified-name})
-           ["INSERT INTO [t/user] (`q/id`, `q/status`) VALUES (?, ?)" [42 "hello"] [35 "world"] [64 "dollars"]]))))
+           ["INSERT INTO [user] (`id`, `status`) VALUES (?, ?)" [42 "hello"] [35 "world"] [64 "dollars"]]))))
