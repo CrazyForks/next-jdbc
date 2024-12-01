@@ -70,6 +70,9 @@
   [key-map opts]
   (as-cols (keys key-map) opts))
 
+(defn- validate [expr ^String msg]
+  (when-not expr (throw (IllegalArgumentException. msg))))
+
 (defn by-keys
   "Given a hash map of column names and values and a clause type
   (`:set`, `:where`), return a vector of a SQL clause and its parameters.
@@ -84,7 +87,7 @@
                                         [(conj conds (str e " = ?")) (conj params v)])))
                                   [[] []]
                                   key-map)]
-    (assert (seq where) "key-map may not be empty")
+    (validate (seq where) "key-map may not be empty")
     (into [(str (str/upper-case (safe-name clause)) " "
                 (str/join (if (= :where clause) " AND " ", ") where))]
           params)))
@@ -122,7 +125,7 @@
   (let [entity-fn (:table-fn opts identity)
         params    (as-keys key-map opts)
         places    (as-? key-map opts)]
-    (assert (seq key-map) "key-map may not be empty")
+    (validate (seq key-map) "key-map may not be empty")
     (into [(str "INSERT INTO " (entity-fn (safe-name table))
                 " (" params ")"
                 " VALUES (" places ")"
@@ -144,11 +147,11 @@
   If `:suffix` is provided in `opts`, that string is appended to the
   `INSERT ...` statement."
   [table cols rows opts]
-  (assert (apply = (count cols) (map count rows))
-          "column counts are not consistent across cols and rows")
+  (validate (apply = (count cols) (map count rows))
+            "column counts are not consistent across cols and rows")
   ;; to avoid generating bad SQL
-  (assert (seq cols) "cols may not be empty")
-  (assert (seq rows) "rows may not be empty")
+  (validate (seq cols) "cols may not be empty")
+  (validate (seq rows) "rows may not be empty")
   (let [table-fn  (:table-fn opts identity)
         batch?    (:batch opts)
         params    (as-cols cols opts)
@@ -195,7 +198,7 @@
   [order-by opts]
   (when-not (vector? order-by)
     (throw (IllegalArgumentException. ":order-by must be a vector")))
-  (assert (seq order-by) ":order-by may not be empty")
+  (validate (seq order-by) ":order-by may not be empty")
   (str "ORDER BY "
        (str/join ", " (map #(for-order-col % opts) order-by))))
 
