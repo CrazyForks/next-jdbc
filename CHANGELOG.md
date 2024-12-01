@@ -6,6 +6,7 @@ Only accretive/fixative changes will be made from now on.
   * Address [#288](https://github.com/seancorfield/next-jdbc/issues/288) by adding speculative support for `:dbtype "xtdb"`.
   * Fix [#287](https://github.com/seancorfield/next-jdbc/issues/287) by merging user-supplied options over `:return-keys true`.
   * Fix [#282](https://github.com/seancorfield/next-jdbc/issues/282) by tracking raw `Connection` objects for active TXs, which relaxes several of the conditions around nested transactions.
+  * Replace `assert` calls with proper validation, throwing `IllegalArgumentException` on failure.
   * Removed (experimental) `:name-fn` option since the driver for it no longer exists (qualified columns names in XTDB).
 
 * 1.3.955 -- 2024-10-06
