@@ -158,7 +158,7 @@
 
 (deftest test-for-update
   (testing "empty example (would be a SQL error)"
-    (is (thrown? AssertionError ; changed in #44
+    (is (thrown? IllegalArgumentException
                  (builder/for-update :user
                                      {:status 42}
                                      {}

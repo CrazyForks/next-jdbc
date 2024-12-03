@@ -58,6 +58,9 @@
   (mapv (fn [^Integer i] (keyword (.getColumnLabel rsmeta i)))
         (range 1 (inc (if rsmeta (.getColumnCount rsmeta) 0)))))
 
+(defn- validate [expr ^String msg]
+  (when-not expr (throw (IllegalArgumentException. msg))))
+
 (defn get-modified-column-names
   "Given `ResultSetMetaData`, return a vector of modified column names, each
   qualified by the table from which it came.
@@ -66,8 +69,8 @@
   [^ResultSetMetaData rsmeta opts]
   (let [qf (:qualifier-fn opts)
         lf (:label-fn opts)]
-    (assert qf ":qualifier-fn is required")
-    (assert lf ":label-fn is required")
+    (validate qf ":qualifier-fn is required")
+    (validate lf ":label-fn is required")
     (mapv (fn [^Integer i]
             (if-let [q (some-> (get-table-name rsmeta i) (qf) (not-empty))]
               (keyword q (-> (.getColumnLabel rsmeta i) (lf)))
@@ -81,7 +84,7 @@
   Requires the `:label-fn` option."
   [^ResultSetMetaData rsmeta opts]
   (let [lf (:label-fn opts)]
-    (assert lf ":label-fn is required")
+    (validate lf ":label-fn is required")
     (mapv (fn [^Integer i] (keyword (lf (.getColumnLabel rsmeta i))))
           (range 1 (inc (if rsmeta (.getColumnCount rsmeta) 0))))))
 
@@ -910,7 +913,7 @@
                                          (first sql-params)
                                          (rest sql-params)
                                          opts)]
-            (reduce-stmt stmt f init opts)))
+          (reduce-stmt stmt f init opts)))
       r/CollFold
       (coll-fold [_ n combinef reducef]
         (with-open [con  (p/get-connection this opts)
@@ -926,12 +929,12 @@
                                      (first sql-params)
                                      (rest sql-params)
                                      opts)]
-        (if-let [rs (stmt->result-set stmt opts)]
-          (let [builder-fn (get opts :builder-fn as-maps)
-                builder    (builder-fn rs opts)]
-            (when (.next rs)
-                  (datafiable-row (row-builder builder) this opts)))
-          {:next.jdbc/update-count (.getUpdateCount stmt)})))
+      (if-let [rs (stmt->result-set stmt opts)]
+        (let [builder-fn (get opts :builder-fn as-maps)
+              builder    (builder-fn rs opts)]
+          (when (.next rs)
+            (datafiable-row (row-builder builder) this opts)))
+        {:next.jdbc/update-count (.getUpdateCount stmt)})))
   (-execute-all [this sql-params opts]
     (with-open [con  (p/get-connection this opts)
                 stmt (prepare/create con
@@ -982,8 +985,8 @@
 
   java.sql.Statement
   (-execute [this sql-params opts]
-    (assert (= 1 (count sql-params))
-            "Parameters cannot be provided when executing a non-prepared Statement")
+    (validate (= 1 (count sql-params))
+              "Parameters cannot be provided when executing a non-prepared Statement")
     (reify
       clojure.lang.IReduceInit
       (reduce [_ f init]
@@ -994,8 +997,8 @@
                        (.getConnection this) opts))
       (toString [_] "`IReduceInit` from `plan` -- missing reduction?")))
   (-execute-one [this sql-params opts]
-    (assert (= 1 (count sql-params))
-            "Parameters cannot be provided when executing a non-prepared Statement")
+    (validate (= 1 (count sql-params))
+              "Parameters cannot be provided when executing a non-prepared Statement")
     (if-let [rs (stmt-sql->result-set this (first sql-params))]
       (let [builder-fn (get opts :builder-fn as-maps)
             builder    (builder-fn rs opts)]
@@ -1004,8 +1007,8 @@
                           (.getConnection this) opts)))
       {:next.jdbc/update-count (.getUpdateCount this)}))
   (-execute-all [this sql-params opts]
-    (assert (= 1 (count sql-params))
-            "Parameters cannot be provided when executing a non-prepared Statement")
+    (validate (= 1 (count sql-params))
+              "Parameters cannot be provided when executing a non-prepared Statement")
     (if (:multi-rs opts)
       (loop [go (.execute this (first sql-params)) acc []]
         (if-let [rs (stmt->result-set-update-count
