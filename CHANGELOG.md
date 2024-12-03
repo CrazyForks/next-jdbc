@@ -2,7 +2,7 @@
 
 Only accretive/fixative changes will be made from now on.
 
-* 1.3.next in progress
+* 1.3.967 -- 2024-12-02
   * Address [#288](https://github.com/seancorfield/next-jdbc/issues/288) by adding speculative support for `:dbtype "xtdb"`.
   * Fix [#287](https://github.com/seancorfield/next-jdbc/issues/287) by merging user-supplied options over `:return-keys true`.
   * Fix [#282](https://github.com/seancorfield/next-jdbc/issues/282) by tracking raw `Connection` objects for active TXs, which relaxes several of the conditions around nested transactions.
@@ -13,7 +13,7 @@ Only accretive/fixative changes will be made from now on.
   * Address [#285](https://github.com/seancorfield/next-jdbc/issues/285) by setting the default Clojure version to the earliest supported (1.10.3) to give a better hint to users.
   * Update PostgreSQL **Tips & Tricks** example code to fix possible NPE. PR [#284](https://github.com/seancorfield/next-jdbc/pull/284) from [@ExNexu](https://github.com/ExNexu).
   * Address [#283](https://github.com/seancorfield/next-jdbc/issues/283) by adding a note in the documentation, linking to the PostgreSQL bug report about `ANY(array)`.
-  * ~Address [#269](https://github.com/seancorfield/next-jdbc/issues/269) by adding `:name-fn` as an option (primarily for the SQL builder functions, but also for result set processing); the default is `clojure.core/name` but you can now use `next.jdbc.sql.builder/qualified-name` to preserve the qualifier.~ _[This was remove in 1.3.next since XTDB no longer supports qualified column names]_
+  * ~Address [#269](https://github.com/seancorfield/next-jdbc/issues/269) by adding `:name-fn` as an option (primarily for the SQL builder functions, but also for result set processing); the default is `clojure.core/name` but you can now use `next.jdbc.sql.builder/qualified-name` to preserve the qualifier.~ _[This was removed in 1.3.967 since XTDB no longer supports qualified column names]_
   * Update testing deps; `docker-compose` => `docker compose`.
 
 * 1.3.939 -- 2024-05-17
