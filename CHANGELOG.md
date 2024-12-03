@@ -2,6 +2,9 @@
 
 Only accretive/fixative changes will be made from now on.
 
+* 1.3.next in progress
+  * Update dev/test dependencies.
+
 * 1.3.967 -- 2024-12-02
   * Address [#288](https://github.com/seancorfield/next-jdbc/issues/288) by adding speculative support for `:dbtype "xtdb"`.
   * Fix [#287](https://github.com/seancorfield/next-jdbc/issues/287) by merging user-supplied options over `:return-keys true`.
