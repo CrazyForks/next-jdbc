@@ -64,7 +64,7 @@
 (def ^:private test-jtds
   (when (System/getenv "NEXT_JDBC_TEST_MSSQL") test-jtds-map))
 
-(def ^:private test-xtdb-map {:dbtype "xtdb"})
+(def ^:private test-xtdb-map {:dbtype "xtdb" :dbname "xtdb"})
 
 (def ^:private test-xtdb
   (when (System/getenv "NEXT_JDBC_TEST_XTDB") test-xtdb-map))
