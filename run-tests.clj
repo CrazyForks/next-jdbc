@@ -12,12 +12,15 @@
       (System/exit exit))))
 
 (let [maria? (some #(= "maria" %) *command-line-args*)
+      xtdb?  (some #(= "xtdb"  %) *command-line-args*)
       all?   (some #(= "all"   %) *command-line-args*)
       env
       (cond-> {"NEXT_JDBC_TEST_MSSQL" "yes"
                "NEXT_JDBC_TEST_MYSQL" "yes"
                "MSSQL_SA_PASSWORD"    "Str0ngP4ssw0rd"}
         maria?
-        (assoc "NEXT_JDBC_TEST_MARIADB" "yes"))]
+        (assoc "NEXT_JDBC_TEST_MARIADB" "yes")
+        xtdb?
+        (assoc "NEXT_JDBC_TEST_XTDB" "yes"))]
   (doseq [v (if all? ["1.10" "1.11" "1.12"] [nil])]
     (run-tests env v)))

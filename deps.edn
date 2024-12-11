@@ -1,4 +1,5 @@
-{:mvn/repos {"sonatype" {:url "https://oss.sonatype.org/content/repositories/snapshots/"}}
+{:mvn/repos {"sonatype" {:url "https://oss.sonatype.org/content/repositories/snapshots/"}
+             "ossrh-snapshots" {:url "https://s01.oss.sonatype.org/content/repositories/snapshots"}}
  :paths ["src" "resources"]
  :deps {org.clojure/clojure {:mvn/version "1.10.3"}
         org.clojure/java.data {:mvn/version "1.2.107"}
@@ -40,6 +41,8 @@
                       io.zonky.test.postgres/embedded-postgres-binaries-windows-amd64 {:mvn/version "17.2.0"}
                       org.xerial/sqlite-jdbc {:mvn/version "3.47.1.0"}
                       com.microsoft.sqlserver/mssql-jdbc {:mvn/version "12.8.1.jre11"}
+                      ;; prerelease XTDB JDBC module:
+                      com.xtdb/xtdb-jdbc {:mvn/version "2.0.0-SNAPSHOT"}
                       ;; use log4j2 to reduce log noise during testing:
                       org.apache.logging.log4j/log4j-api {:mvn/version "2.24.2"}
                       ;; bridge everything into log4j:

@@ -278,6 +278,10 @@
                               :qualifier-fn ->kebab-case
                               :label-fn ->kebab-case)))
 
+(comment
+  (->kebab-case "_id") ;;=> "id"!!
+  )
+
 (defn as-unqualified-kebab-maps
   "Given a `ResultSet` and options, return a `RowBuilder` / `ResultSetBuilder`
   that produces bare vectors of hash map rows, with simple, kebab-case keys."

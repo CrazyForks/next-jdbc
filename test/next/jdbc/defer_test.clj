@@ -15,39 +15,40 @@
             [next.jdbc :as jdbc]
             [next.jdbc.defer :as sut]
             [next.jdbc.test-fixtures
-             :refer [ds with-test-db]]))
+             :refer [ds with-test-db xtdb?]]))
 
 (set! *warn-on-reflection* true)
 
 (use-fixtures :once with-test-db)
 
 (deftest basic-test
-  (testing "data structures"
-    (is (= [{:sql-p ["INSERT INTO foo (name) VALUES (?)" "Sean"]
-             :key-fn :GENERATED_KEY
-             :key    :id
-             :opts   {:key-fn :GENERATED_KEY :key :id}}]
-           @(sut/defer-ops
-             #(sut/insert! :foo {:name "Sean"} {:key-fn :GENERATED_KEY :key :id})))))
-  (testing "execution"
-    (let [effects (sut/with-deferred (ds)
-                    (sut/insert! :fruit {:name "Mango"} {:key :test}))]
-      (is (= {:test 1} @effects))
-      (is (= 1 (count (jdbc/execute! (ds)
-                                     ["select * from fruit where name = ?"
-                                      "Mango"])))))
-    (let [effects (sut/with-deferred (ds)
-                    (sut/insert! :fruit {:name "Dragonfruit"} {:key :test})
-                    (sut/update! :fruit {:cost 123} {:name "Dragonfruit"})
-                    (sut/delete! :fruit {:name "Dragonfruit"}))]
-      (is (= {:test 1} @effects))
-      (is (= 0 (count (jdbc/execute! (ds)
-                                     ["select * from fruit where name = ?"
-                                      "Dragonfruit"])))))
-    (let [effects (sut/with-deferred (ds)
-                    (sut/insert! :fruit {:name "Grapefruit" :bad_column 0} {:key :test}))]
-      (is (= :failed (try @effects
-                          (catch Exception _ :failed))))
-      (is (= 0 (count (jdbc/execute! (ds)
-                                     ["select * from fruit where name = ?"
-                                      "Grapefruit"])))))))
+  (when-not (xtdb?)
+    (testing "data structures"
+      (is (= [{:sql-p ["INSERT INTO foo (name) VALUES (?)" "Sean"]
+               :key-fn :GENERATED_KEY
+               :key    :id
+               :opts   {:key-fn :GENERATED_KEY :key :id}}]
+             @(sut/defer-ops
+               #(sut/insert! :foo {:name "Sean"} {:key-fn :GENERATED_KEY :key :id})))))
+    (testing "execution"
+      (let [effects (sut/with-deferred (ds)
+                      (sut/insert! :fruit {:name "Mango"} {:key :test}))]
+        (is (= {:test 1} @effects))
+        (is (= 1 (count (jdbc/execute! (ds)
+                                       ["select * from fruit where name = ?"
+                                        "Mango"])))))
+      (let [effects (sut/with-deferred (ds)
+                      (sut/insert! :fruit {:name "Dragonfruit"} {:key :test})
+                      (sut/update! :fruit {:cost 123} {:name "Dragonfruit"})
+                      (sut/delete! :fruit {:name "Dragonfruit"}))]
+        (is (= {:test 1} @effects))
+        (is (= 0 (count (jdbc/execute! (ds)
+                                       ["select * from fruit where name = ?"
+                                        "Dragonfruit"])))))
+      (let [effects (sut/with-deferred (ds)
+                      (sut/insert! :fruit {:name "Grapefruit" :bad_column 0} {:key :test}))]
+        (is (= :failed (try @effects
+                            (catch Exception _ :failed))))
+        (is (= 0 (count (jdbc/execute! (ds)
+                                       ["select * from fruit where name = ?"
+                                        "Grapefruit"]))))))))

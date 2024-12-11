@@ -6,7 +6,7 @@
             [next.jdbc.plan :as plan]
             [next.jdbc.specs :as specs]
             [next.jdbc.test-fixtures
-             :refer [with-test-db ds]]
+             :refer [with-test-db ds col-kw index]]
             [clojure.string :as str]))
 
 (set! *warn-on-reflection* true)
@@ -17,56 +17,56 @@
 (specs/instrument)
 
 (deftest select-one!-tests
-  (is (= {:id 1}
-         (plan/select-one! (ds) [:id] ["select * from fruit order by id"])))
+  (is (= {(col-kw :id) 1}
+         (plan/select-one! (ds) [(col-kw :id)] [(str "select * from fruit order by " (index))])))
   (is (= 1
-         (plan/select-one! (ds) :id ["select * from fruit order by id"])))
+         (plan/select-one! (ds) (col-kw :id) [(str "select * from fruit order by " (index))])))
   (is (= "Banana"
-         (plan/select-one! (ds) :name ["select * from fruit where id = ?" 2])))
+         (plan/select-one! (ds) :name [(str "select * from fruit where " (index) " = ?") 2])))
   (is (= [1 "Apple"]
-         (plan/select-one! (ds) (juxt :id :name)
-                           ["select * from fruit order by id"])))
-  (is (= {:id 1 :name "Apple"}
-         (plan/select-one! (ds) #(select-keys % [:id :name])
-                           ["select * from fruit order by id"]))))
+         (plan/select-one! (ds) (juxt (col-kw :id) :name)
+                           [(str "select * from fruit order by " (index))])))
+  (is (= {(col-kw :id) 1 :name "Apple"}
+         (plan/select-one! (ds) #(select-keys % [(col-kw :id) :name])
+                           [(str "select * from fruit order by " (index))]))))
 
 (deftest select-vector-tests
-  (is (= [{:id 1} {:id 2} {:id 3} {:id 4}]
-         (plan/select! (ds) [:id] ["select * from fruit order by id"])))
+  (is (= [{(col-kw :id) 1} {(col-kw :id) 2} {(col-kw :id) 3} {(col-kw :id) 4}]
+         (plan/select! (ds) [(col-kw :id)] [(str "select * from fruit order by " (index))])))
   (is (= [1 2 3 4]
-         (plan/select! (ds) :id ["select * from fruit order by id"])))
+         (plan/select! (ds) (col-kw :id) [(str "select * from fruit order by " (index))])))
   (is (= ["Banana"]
-         (plan/select! (ds) :name ["select * from fruit where id = ?" 2])))
+         (plan/select! (ds) :name [(str "select * from fruit where " (index) " = ?") 2])))
   (is (= [[2 "Banana"]]
-         (plan/select! (ds) (juxt :id :name)
-                       ["select * from fruit where id = ?" 2])))
-  (is (= [{:id 2 :name "Banana"}]
-         (plan/select! (ds) [:id :name]
-                       ["select * from fruit where id = ?" 2]))))
+         (plan/select! (ds) (juxt (col-kw :id) :name)
+                       [(str "select * from fruit where " (index) " = ?") 2])))
+  (is (= [{(col-kw :id) 2 :name "Banana"}]
+         (plan/select! (ds) [(col-kw :id) :name]
+                       [(str "select * from fruit where " (index) " = ?") 2]))))
 
 (deftest select-set-tests
-  (is (= #{{:id 1} {:id 2} {:id 3} {:id 4}}
-         (plan/select! (ds) [:id] ["select * from fruit order by id"]
+  (is (= #{{(col-kw :id) 1} {(col-kw :id) 2} {(col-kw :id) 3} {(col-kw :id) 4}}
+         (plan/select! (ds) [(col-kw :id)] [(str "select * from fruit order by " (index))]
                        {:into #{}})))
   (is (= #{1 2 3 4}
-         (plan/select! (ds) :id ["select * from fruit order by id"]
+         (plan/select! (ds) (col-kw :id) [(str "select * from fruit order by " (index))]
                        {:into #{}}))))
 
 (deftest select-map-tests
   (is (= {1 "Apple", 2 "Banana", 3 "Peach", 4 "Orange"}
-         (plan/select! (ds) (juxt :id :name) ["select * from fruit order by id"]
+         (plan/select! (ds) (juxt (col-kw :id) :name) [(str "select * from fruit order by " (index))]
                        {:into {}}))))
 
 (deftest select-issue-227
   (is (= ["Apple"]
-         (plan/select! (ds) :name ["select * from fruit where id = ?" 1]
+         (plan/select! (ds) :name [(str "select * from fruit where " (index) " = ?") 1]
                        {:column-fn #(str/replace % "-" "_")})))
   (is (= ["Apple"]
-         (plan/select! (ds) :foo/name ["select * from fruit where id = ?" 1]
+         (plan/select! (ds) :foo/name [(str "select * from fruit where " (index) " = ?") 1]
                        {:column-fn #(str/replace % "-" "_")})))
   (is (= ["Apple"]
-         (plan/select! (ds) #(get % "name") ["select * from fruit where id = ?" 1]
+         (plan/select! (ds) #(get % "name") [(str "select * from fruit where " (index) " = ?") 1]
                        {:column-fn #(str/replace % "-" "_")})))
   (is (= [["Apple"]]
-         (plan/select! (ds) (juxt :name) ["select * from fruit where id = ?" 1]
+         (plan/select! (ds) (juxt :name) [(str "select * from fruit where " (index) " = ?") 1]
                        {:column-fn #(str/replace % "-" "_")}))))

@@ -14,3 +14,8 @@ services:
       MSSQL_SA_PASSWORD: Str0ngP4ssw0rd
     ports:
       - "1433:1433"
+  xtdb:
+    image: ghcr.io/xtdb/xtdb
+    pull_policy: always
+    ports:
+      - "5432:5432"
