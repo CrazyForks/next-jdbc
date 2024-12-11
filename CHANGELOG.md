@@ -3,6 +3,7 @@
 Only accretive/fixative changes will be made from now on.
 
 * 1.3.next in progress
+  * Added XTDB as a supported database for testing via PR [#290](https://github.com/seancorfield/next-jdbc/pull/290). _Note: not all features are tested against XTDB due to several fundamental differences in architecture, mostly around primary key/generated keys and lack of DDL operations (since XTDB is schemaless)._
   * Update dev/test dependencies.
 
 * 1.3.967 -- 2024-12-02
