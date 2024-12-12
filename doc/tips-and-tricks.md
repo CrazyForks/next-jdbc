@@ -55,7 +55,7 @@ be very database-specific. Some database drivers **don't** use the hierarchy
 above -- notably PostgreSQL, which has a generic `PSQLException` type
 with its own subclasses and semantics. See [PostgreSQL JDBC issue #963](https://github.com/pgjdbc/pgjdbc/issues/963)
 for a discussion of the difficulty in adopting the standard JDBC hierarchy
-(dating back five years).
+(dating back to 2017!).
 
 The `java.sql.SQLException` class provides `.getErrorCode()` and
 `.getSQLState()` methods but the values returned by those are
@@ -237,6 +237,7 @@ common approach, there is also a non-JDBC Clojure/Java driver for PostgreSQL cal
 quite a bit faster than using JDBC.
 
 When you use `:return-keys true` with `execute!` or `execute-one!` (or you use `insert!`), PostgreSQL returns the entire inserted row (unlike nearly every other database that just returns any generated keys!).
+_[It seems to achieve this by the equivalent of automatically appending `RETURNING *` to your SQL, if necessary.]_
 
 The default result set builder for `next.jdbc` is `as-qualified-maps` which
 uses the `.getTableName()` method on `ResultSetMetaData` to qualify the
@@ -574,3 +575,27 @@ If you are using `plan`, you'll most likely be accessing columns by just the lab
 
 See also [`datafy`, `nav`, and `:schema` > **SQLite**](/doc/datafy-nav-and-schema.md#sqlite)
 for additional caveats on the `next.jdbc.datafy` namespace when using SQLite.
+
+## XTDB
+
+XTDB is a bitemporal, schemaless, document-oriented database that presents
+itself as a PostgreSQL-compatible database, in terms of JDBC. It has a number
+of SQL extensions, and some differences from common JDBC behavior. See
+its documentation for details:
+* [SQL Overview](https://docs.xtdb.com/quickstart/sql-overview.html)
+* [SQL Queries](https://docs.xtdb.com/reference/main/sql/queries.html)
+* [SQL Transactions/DML](https://docs.xtdb.com/reference/main/sql/txs.html)
+
+`next.jdbc` officially supports XTDB as of 1.3.next but there are some caveats:
+* You can use `:dbtype "xtdb"` to identify XTDB as the database type.
+* You must specify `:dbname "xtdb"` in the db-spec hash map or JDBC URL.
+* XTDB does not support `.getTableName()` so you always get unqualified column names in result sets.
+* The `:max-rows` / `:maxRows` options are not (yet) supported by XTDB (use `LIMIT` in your SQL instead).
+* The primary key on all tables is `_id` and it must be specified in all `INSERT` operations (no auto-generated keys).
+* That means that `next.jdbc.sql/get-by-id` requires the 5-argument call, so that you can specify the `pk-name` as `:_id` and provide an options map.
+* If you want to use `next.jdbc`'s built-in `datafy` / `nav` functionality, you need to explicitly specify `:schema-opts {:pk "_id"}` to override the default assumption of `id` as the primary key.
+* DML operations (`INSERT`, `UPDATE`, and `DELETE`) are essentially asynchronous in XTDB and therefore can not return an accurate `next.jdbc/update-count` (so it is always 0).
+* `INSERT` operations do not return the inserted row (like PostgreSQL does) nor even the provided `_id` primary key.
+* That means that the `next.jdbc.defer` namespace functions do not work well with XTDB.
+* `next.jdbc.sql/insert-multi!` returns an empty vector for XTDB (since `INSERT` operations do not return keys or update counts).
+* The `next.jdbc.result-set/*-kebab-maps` functions (and associated `next.jdbc/*-kebab-opts` option maps) cause leading `_` to be stripped from column names and cannot be used with XTDB (this is inherent in the underlying library that `next.jdbc` relies on -- you can of course write your own custom result set builder function to handle this).
