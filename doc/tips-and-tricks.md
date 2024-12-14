@@ -586,11 +586,10 @@ its documentation for details:
 * [SQL Queries](https://docs.xtdb.com/reference/main/sql/queries.html)
 * [SQL Transactions/DML](https://docs.xtdb.com/reference/main/sql/txs.html)
 
-`next.jdbc` officially supports XTDB as of 1.3.next but there are some caveats:
+`next.jdbc` officially supports XTDB as of 1.3.981 but there are some caveats:
 * You can use `:dbtype "xtdb"` to identify XTDB as the database type.
 * You must specify `:dbname "xtdb"` in the db-spec hash map or JDBC URL.
 * XTDB does not support `.getTableName()` so you always get unqualified column names in result sets.
-* The `:max-rows` / `:maxRows` options are not (yet) supported by XTDB (use `LIMIT` in your SQL instead).
 * The primary key on all tables is `_id` and it must be specified in all `INSERT` operations (no auto-generated keys).
 * That means that `next.jdbc.sql/get-by-id` requires the 5-argument call, so that you can specify the `pk-name` as `:_id` and provide an options map.
 * If you want to use `next.jdbc`'s built-in `datafy` / `nav` functionality, you need to explicitly specify `:schema-opts {:pk "_id"}` to override the default assumption of `id` as the primary key.
