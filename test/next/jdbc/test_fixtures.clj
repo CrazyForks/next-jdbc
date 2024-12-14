@@ -80,6 +80,8 @@
 
 (defn derby? [] (= "derby" (:dbtype @test-db-spec)))
 
+(defn h2? [] (str/starts-with? (:dbtype @test-db-spec) "h2"))
+
 (defn hsqldb? [] (= "hsqldb" (:dbtype @test-db-spec)))
 
 (defn jtds? [] (= "jtds" (:dbtype @test-db-spec)))
@@ -180,7 +182,10 @@
         (if (xtdb?) ; no DDL for creation
           (do
             (try
-              (do-commands con ["DELETE FROM fruit WHERE true"])
+              (do-commands con ["ERASE FROM fruit WHERE true"])
+              (catch Throwable _))
+            (try
+              (do-commands con ["ERASE FROM btest WHERE true"])
               (catch Throwable _))
             (sql/insert-multi! con :fruit
                                [:_id :name :appearance :cost]

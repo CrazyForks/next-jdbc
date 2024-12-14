@@ -12,8 +12,8 @@
    [next.jdbc.result-set :as rs]
    [next.jdbc.specs :as specs]
    [next.jdbc.test-fixtures
-             :refer [col-kw column db default-options derby? ds hsqldb? index
-                     jtds? mssql? mysql? postgres? sqlite? stored-proc?
+             :refer [col-kw column db default-options derby? ds h2? hsqldb?
+                     index jtds? mssql? mysql? postgres? sqlite? stored-proc?
                      with-test-db xtdb?]]
    [next.jdbc.types :as types])
   (:import
@@ -501,61 +501,93 @@ VALUES ('Pear', 'green', 49, 47)
                "\n\t" (ex-message t)))))
 
 (deftest bool-tests
-  (when-not (xtdb?)
-    (doseq [[n b] [["zero" 0] ["one" 1] ["false" false] ["true" true]]
-            :let [v-bit  (if (number? b) b (if b 1 0))
-                  v-bool (if (number? b) (pos? b) b)]]
-      (jdbc/execute-one!
-       (ds)
-       ["insert into btest (name,is_it,twiddle) values (?,?,?)"
-        n
-        (if (postgres?)
-          (types/as-boolean b)
-          b) ; 0, 1, false, true are all acceptable
-        (cond (hsqldb?)
-              v-bool ; hsqldb requires a boolean here
-              (postgres?)
-              (types/as-other v-bit) ; really postgres??
-              :else
-              v-bit)]))
-    (let [data (jdbc/execute! (ds) ["select * from btest"]
-                              (default-options))]
-      (if (sqlite?)
-        (is (every? number?  (map (column :BTEST/IS_IT) data)))
-        (is (every? boolean? (map (column :BTEST/IS_IT) data))))
-      (if (or (sqlite?) (derby?))
-        (is (every? number?  (map (column :BTEST/TWIDDLE) data)))
-        (is (every? boolean? (map (column :BTEST/TWIDDLE) data)))))
-    (let [data (jdbc/execute! (ds) ["select * from btest"]
-                              (cond-> (default-options)
-                                (sqlite?)
-                                (assoc :builder-fn
-                                       (rs/builder-adapter
-                                        rs/as-maps
-                                        (fn [builder ^ResultSet rs ^Integer i]
-                                          (let [rsm ^ResultSetMetaData (:rsmeta builder)]
-                                            (rs/read-column-by-index
-                                           ;; we only use bit and bool for
-                                           ;; sqlite (not boolean)
-                                             (if (#{"BIT" "BOOL"} (.getColumnTypeName rsm i))
-                                               (.getBoolean rs i)
-                                               (.getObject rs i))
-                                             rsm
-                                             i)))))))]
-      (is (every? boolean? (map (column :BTEST/IS_IT) data)))
-      (if (derby?)
-        (is (every? number?  (map (column :BTEST/TWIDDLE) data)))
-        (is (every? boolean? (map (column :BTEST/TWIDDLE) data)))))
-    (let [data (reduce (fn [acc row]
-                         (conj acc (cond-> (select-keys row [:is_it :twiddle])
-                                     (sqlite?)
-                                     (update :is_it pos?)
-                                     (or (sqlite?) (derby?))
-                                     (update :twiddle pos?))))
-                       []
-                       (jdbc/plan (ds) ["select * from btest"]))]
-      (is (every? boolean? (map :is_it data)))
-      (is (every? boolean? (map :twiddle data))))))
+  (testing (str "bool-tests for " (:dbtype (db)))
+    (let [lit-t (cond (hsqldb?) "(1=1)" (mssql?) "1" :else "TRUE")
+          lit-f (cond (hsqldb?) "(1=0)" (mssql?) "0" :else "FALSE")]
+      (when-not (or (hsqldb?) (derby?))
+        (testing "literal TRUE select"
+          (is (= {(column :V) (if (or (sqlite?) (mysql?) (mssql?)) 1 true)}
+                 (jdbc/execute-one! (ds) [(str "SELECT " lit-t " AS V")]))))
+        (testing "literal FALSE select"
+          (is (= {(column :V) (if (or (sqlite?) (mysql?) (mssql?)) 0 false)}
+                 (jdbc/execute-one! (ds) [(str "SELECT " lit-f " AS V")])))))
+      (testing "literal TRUE insert"
+        (jdbc/execute-one!
+         (ds)
+         [(str "insert into btest (" (if (xtdb?) "_id" "name") ",is_it,twiddle)"
+               " values ('lit_t'," lit-t ","
+               (if (or (derby?) (sqlite?) (h2?) (mssql?) (xtdb?)) "1" "b'1'")
+               ")")]))
+      (testing "literal FALSE insert"
+        (jdbc/execute-one!
+         (ds)
+         [(str "insert into btest (" (if (xtdb?) "_id" "name") ",is_it,twiddle)"
+               " values ('lit_f'," lit-f ","
+               (if (or (derby?) (sqlite?) (h2?) (mssql?) (xtdb?)) "0" "b'0'")
+               ")")]))
+      (testing "BIT/BOOLEAN value insertion"
+        (doseq [[n b] [["zero" 0] ["one" 1] ["false" false] ["true" true]]
+                :let [v-bit  (if (number? b) b (if b 1 0))
+                      v-bool (if (number? b) (pos? b) b)]]
+          (jdbc/execute-one!
+           (ds)
+           [(str "insert into btest ("
+                 (if (xtdb?) "_id" "name")
+                 ",is_it,twiddle) values (?,?,?)")
+            n
+            (if (or (postgres?) (xtdb?))
+              (types/as-boolean b)
+              b) ; 0, 1, false, true are all acceptable
+            (cond (hsqldb?)
+                  v-bool ; hsqldb requires a boolean here
+                  (postgres?)
+                  (types/as-other v-bit) ; really postgres??
+                  :else
+                  v-bit)])))
+      (testing "BOOLEAN results from SELECT"
+        (let [data (jdbc/execute! (ds) ["select * from btest"]
+                                  (default-options))]
+          (if (sqlite?)
+            (is (every? number?  (map (column :BTEST/IS_IT) data)))
+            (is (every? boolean? (map (column :BTEST/IS_IT) data))))
+          (if (or (sqlite?) (derby?) (xtdb?))
+            (is (every? number?  (map (column :BTEST/TWIDDLE) data)))
+            (is (every? boolean? (map (column :BTEST/TWIDDLE) data))))))
+      (testing "BOOLEAN read column by index"
+        (let [data (jdbc/execute! (ds) ["select * from btest"]
+                                  (cond-> (default-options)
+                                    (or (sqlite?) (xtdb?))
+                                    (assoc :builder-fn
+                                           (rs/builder-adapter
+                                            rs/as-maps
+                                            (fn [builder ^ResultSet rs ^Integer i]
+                                              (let [rsm ^ResultSetMetaData (:rsmeta builder)]
+                                                (rs/read-column-by-index
+                                                 ;; we only use bit and bool for
+                                                 ;; sqlite (not boolean), and
+                                                 ;; int8 and bool for xtdb:
+                                                 (if (#{"BIT" "BOOL"
+                                                        "int8" "bool"}
+                                                      (.getColumnTypeName rsm i))
+                                                   (.getBoolean rs i)
+                                                   (.getObject rs i))
+                                                 rsm
+                                                 i)))))))]
+          (is (every? boolean? (map (column :BTEST/IS_IT) data)))
+          (if (derby?)
+            (is (every? number?  (map (column :BTEST/TWIDDLE) data)))
+            (is (every? boolean? (map (column :BTEST/TWIDDLE) data))))))
+      (testing "BOOLEAN via coercion"
+        (let [data (reduce (fn [acc row]
+                             (conj acc (cond-> (select-keys row [:is_it :twiddle])
+                                         (sqlite?)
+                                         (update :is_it pos?)
+                                         (or (sqlite?) (derby?) (xtdb?))
+                                         (update :twiddle pos?))))
+                           []
+                           (jdbc/plan (ds) ["select * from btest"]))]
+          (is (every? boolean? (map :is_it data)))
+          (is (every? boolean? (map :twiddle data))))))))
 
 (deftest execute-batch-tests
   (when-not (xtdb?)
