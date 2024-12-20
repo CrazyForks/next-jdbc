@@ -12,6 +12,7 @@ The latest versions on Clojars and on cljdoc:
 [![cljdoc](https://cljdoc.org/badge/com.github.seancorfield/next.jdbc?1.3.981)](https://cljdoc.org/d/com.github.seancorfield/next.jdbc/CURRENT)
 [![Slack](https://img.shields.io/badge/slack-next.jdbc-orange.svg?logo=slack)](https://clojurians.slack.com/app_redirect?channel=sql)
 [![Join Slack](https://img.shields.io/badge/slack-join_clojurians-orange.svg?logo=slack)](http://clojurians.net)
+[![Zulip](https://img.shields.io/badge/zulip-next.jdbc-orange.svg)](https://clojurians.zulipchat.com/#narrow/channel/152063-sql)
 
 The documentation on [cljdoc.org](https://cljdoc.org/d/com.github.seancorfield/next.jdbc/CURRENT) is for the current version of `next.jdbc`:
 
