@@ -117,8 +117,8 @@ will use `execute-batch!` under the hood, instead of `execute!`, as follows:
   {:batch true})
 ;; equivalent to
 (jdbc/execute-batch! ds
-                     ["INSERT INTO address (name,email) VALUES (?,?)"
-                      ["Stella" "stella@artois.beer"]
+                     "INSERT INTO address (name,email) VALUES (?,?)"
+                     [["Stella" "stella@artois.beer"]
                       ["Waldo" "waldo@lagunitas.beer"]
                       ["Aunt Sally" "sour@lagunitas.beer"]]
                      {:return-keys true :return-generated-keys true})
@@ -131,8 +131,8 @@ will use `execute-batch!` under the hood, instead of `execute!`, as follows:
   {:batch true})
 ;; equivalent to
 (jdbc/execute-batch! ds
-                     ["INSERT INTO address (name,email) VALUES (?,?)"
-                      ["Stella" "stella@artois.beer"]
+                     "INSERT INTO address (name,email) VALUES (?,?)"
+                     [["Stella" "stella@artois.beer"]
                       ["Waldo" "waldo@lagunitas.beer"]
                       ["Aunt Sally" "sour@lagunitas.beer"]]
                      {:return-keys true :return-generated-keys true})
